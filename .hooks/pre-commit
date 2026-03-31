@@ -1,0 +1,18 @@
+#!/bin/sh
+
+# Rebuild Tailwind CSS before committing
+# Only runs if any HTML/CSS/JS source files are staged
+
+STAGED=$(git diff --cached --name-only --diff-filter=ACM)
+
+if echo "$STAGED" | grep -qE '\.(html|css|js)$'; then
+  echo "Rebuilding Tailwind CSS..."
+  npm run build:css
+
+  if [ $? -ne 0 ]; then
+    echo "Tailwind CSS build failed. Aborting commit."
+    exit 1
+  fi
+
+  git add dist/output.css
+fi
