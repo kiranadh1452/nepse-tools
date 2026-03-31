@@ -6,6 +6,7 @@
   <title>Risk Calculator — NEPSE Tools</title>
   <link rel="stylesheet" href="../dist/output.css" />
   <link rel="stylesheet" href="styles.css" />
+  <script src="../shared/nepse-api.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <script src="app.js"></script>
 </head>
@@ -287,10 +288,25 @@
                 <div>
                   <span class="text-white font-semibold" x-text="holding.name"></span>
                   <span class="text-muted text-xs ml-2" x-text="holding.qty + ' shares @ NPR ' + fmt(holding.buyPrice)"></span>
+                  <!-- Live price -->
+                  <template x-if="getLivePrice(holding.name) !== null">
+                    <span class="ml-2 text-xs">
+                      <span class="text-gray-400">LTP:</span>
+                      <span class="text-white font-medium" x-text="fmt(getLivePrice(holding.name))"></span>
+                      <span class="ml-1" :class="getLiveChange(holding.name) >= 0 ? 'text-green-400' : 'text-red-400'"
+                        x-text="(getLiveChange(holding.name) >= 0 ? '+' : '') + getLiveChange(holding.name).toFixed(2) + '%'"></span>
+                    </span>
+                  </template>
                 </div>
               </div>
-              <div class="flex items-center gap-2 text-xs text-muted">
-                <span x-text="holding.buyDate"></span>
+              <div class="flex items-center gap-2 text-xs">
+                <!-- Unrealized P/L -->
+                <template x-if="holdingUnrealizedPL(holding) !== null">
+                  <span class="font-medium"
+                    :class="holdingUnrealizedPL(holding).pl >= 0 ? 'text-green-400' : 'text-red-400'"
+                    x-text="(holdingUnrealizedPL(holding).pl >= 0 ? '+' : '') + fmt(holdingUnrealizedPL(holding).pl) + ' (' + holdingUnrealizedPL(holding).pct.toFixed(2) + '%)'"></span>
+                </template>
+                <span class="text-muted" x-text="holding.buyDate"></span>
                 <span class="bg-surface px-2 py-0.5 rounded text-gray-400" x-text="holdingDaysHeld(holding) + 'd'"></span>
               </div>
             </div>

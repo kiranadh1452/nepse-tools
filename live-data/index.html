@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Live Market — NEPSE Tools</title>
+  <link rel="stylesheet" href="../dist/output.css" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    input[type="text"]:focus { outline: none; }
+    .pulse { animation: pulse 2s ease-in-out infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+  </style>
+  <script src="../shared/nepse-api.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-surface text-gray-200 min-h-screen" x-data="liveData" x-init="init()">
+
+  <!-- Header -->
+  <header class="border-b border-border bg-card/60 backdrop-blur-sm sticky top-0 z-20">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <a href="../" class="w-9 h-9 rounded-lg bg-accent flex items-center justify-center hover:opacity-80 transition">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+        </a>
+        <div>
+          <h1 class="text-lg font-bold text-white leading-tight">Live Market</h1>
+          <p class="text-xs text-muted">NEPSE Stock Prices</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full" :class="marketOpen ? 'bg-green-400 pulse' : 'bg-red-400'"></span>
+          <span class="text-xs" :class="marketOpen ? 'text-green-400' : 'text-red-400'" x-text="marketOpen ? 'Market Open' : 'Market Closed'"></span>
+        </div>
+        <span class="text-xs text-muted hidden sm:block" x-text="lastUpdatedText"></span>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
+
+    <!-- Market Overview -->
+    <section class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div class="bg-card rounded-xl border border-border p-4 text-center">
+        <p class="text-xs text-muted uppercase tracking-wider mb-1">Stocks Traded</p>
+        <p class="text-xl font-bold text-white" x-text="overview.stockCount || '—'"></p>
+      </div>
+      <div class="bg-card rounded-xl border border-border p-4 text-center">
+        <p class="text-xs text-muted uppercase tracking-wider mb-1">Turnover</p>
+        <p class="text-xl font-bold text-white" x-text="overview.turnover || '—'"></p>
+      </div>
+      <div class="bg-card rounded-xl border border-border p-4 text-center">
+        <p class="text-xs text-muted uppercase tracking-wider mb-1">Total Qty</p>
+        <p class="text-xl font-bold text-white" x-text="overview.totalQty || '—'"></p>
+      </div>
+      <div class="bg-card rounded-xl border border-border p-4 text-center">
+        <p class="text-xs text-muted uppercase tracking-wider mb-1">Transactions</p>
+        <p class="text-xl font-bold text-white" x-text="overview.transactions || '—'"></p>
+      </div>
+    </section>
+
+    <!-- Controls -->
+    <section class="flex flex-wrap items-center gap-3">
+      <div class="flex-1 min-w-[200px]">
+        <input type="text" x-model="searchQuery" placeholder="Search by symbol..."
+          class="w-full bg-card border border-border rounded-lg px-4 py-2 text-white text-sm focus:ring-2 focus:ring-accent/60 transition" />
+      </div>
+      <div class="flex items-center gap-1">
+        <span class="text-xs text-muted mr-1">Sort:</span>
+        <template x-for="col in sortColumns" :key="col.key">
+          <button @click="toggleSort(col.key)"
+            class="text-xs px-2 py-1 rounded transition"
+            :class="sortBy === col.key ? 'bg-accent/20 text-accent' : 'bg-surface text-gray-400 hover:text-white'">
+            <span x-text="col.label"></span>
+            <span x-show="sortBy === col.key" x-text="sortDir === 'asc' ? '↑' : '↓'"></span>
+          </button>
+        </template>
+      </div>
+      <button @click="refresh()" :disabled="loading"
+        class="bg-accent hover:bg-accent/80 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition flex items-center gap-1.5">
+        <svg class="w-4 h-4" :class="{ 'animate-spin': loading }" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        Refresh
+      </button>
+    </section>
+
+    <!-- Status banner -->
+    <template x-if="!marketOpen && hasData">
+      <div class="bg-yellow-500/10 border border-yellow-500/30 rounded-lg px-4 py-2 text-sm text-yellow-400 flex items-center gap-2">
+        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M5.07 19H19a2 2 0 001.75-2.96l-6.93-12a2 2 0 00-3.5 0l-6.93 12A2 2 0 005.07 19z"/></svg>
+        Market is closed. Showing last available data from <span x-text="lastUpdatedText"></span>.
+      </div>
+    </template>
+
+    <template x-if="!hasData && !loading">
+      <div class="bg-card rounded-xl border border-border p-10 text-center">
+        <p class="text-muted">No market data available. Data is fetched during market hours (Sun–Thu, 11 AM – 3 PM NPT).</p>
+        <button @click="refresh(true)" class="mt-3 text-sm text-accent hover:underline">Force refresh anyway</button>
+      </div>
+    </template>
+
+    <!-- Stock Table -->
+    <template x-if="hasData">
+      <section class="bg-card rounded-xl border border-border overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-border text-gray-400">
+                <th class="px-4 py-3 text-left font-medium">Symbol</th>
+                <th class="px-4 py-3 text-right font-medium">LTP</th>
+                <th class="px-4 py-3 text-right font-medium">Change %</th>
+                <th class="px-4 py-3 text-right font-medium hidden sm:table-cell">Open</th>
+                <th class="px-4 py-3 text-right font-medium hidden sm:table-cell">High</th>
+                <th class="px-4 py-3 text-right font-medium hidden sm:table-cell">Low</th>
+                <th class="px-4 py-3 text-right font-medium hidden md:table-cell">Volume</th>
+                <th class="px-4 py-3 text-right font-medium hidden lg:table-cell">Turnover</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="stock in filteredStocks" :key="stock.symbol">
+                <tr class="border-b border-border/60 hover:bg-surface/30 transition">
+                  <td class="px-4 py-2.5 text-white font-medium" x-text="stock.symbol"></td>
+                  <td class="px-4 py-2.5 text-right text-white font-semibold" x-text="fmt(stock.ltp)"></td>
+                  <td class="px-4 py-2.5 text-right font-medium"
+                    :class="stock.change > 0 ? 'text-green-400' : stock.change < 0 ? 'text-red-400' : 'text-gray-400'"
+                    x-text="(stock.change > 0 ? '+' : '') + stock.change.toFixed(2) + '%'"></td>
+                  <td class="px-4 py-2.5 text-right text-gray-300 hidden sm:table-cell" x-text="fmt(stock.open)"></td>
+                  <td class="px-4 py-2.5 text-right text-gray-300 hidden sm:table-cell" x-text="fmt(stock.high)"></td>
+                  <td class="px-4 py-2.5 text-right text-gray-300 hidden sm:table-cell" x-text="fmt(stock.low)"></td>
+                  <td class="px-4 py-2.5 text-right text-gray-400 hidden md:table-cell" x-text="fmtInt(stock.volume)"></td>
+                  <td class="px-4 py-2.5 text-right text-gray-400 hidden lg:table-cell" x-text="fmtCompact(stock.turnover)"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+        <div class="px-4 py-2 border-t border-border/60 text-xs text-muted flex justify-between">
+          <span x-text="filteredStocks.length + ' of ' + allStocks.length + ' stocks'"></span>
+          <span>Source: Merolagani</span>
+        </div>
+      </section>
+    </template>
+
+  </main>
+
+  <footer class="text-center text-xs text-muted py-6 border-t border-border mt-8">
+    NEPSE Tools &middot; Live Market Data &middot; For informational purposes only
+  </footer>
+
+  <script>
+    document.addEventListener('alpine:init', () => {
+      Alpine.data('liveData', () => ({
+        loading: false,
+        marketOpen: false,
+        allStocks: [],
+        overview: {},
+        lastUpdated: null,
+        searchQuery: '',
+        sortBy: 'turnover',
+        sortDir: 'desc',
+        refreshInterval: null,
+
+        sortColumns: [
+          { key: 'symbol', label: 'Symbol' },
+          { key: 'ltp', label: 'Price' },
+          { key: 'change', label: 'Change' },
+          { key: 'volume', label: 'Volume' },
+          { key: 'turnover', label: 'Turnover' },
+        ],
+
+        async init() {
+          await this.loadData();
+          // Auto-refresh every 10 minutes if market is open
+          this.refreshInterval = setInterval(() => {
+            if (NepseAPI.isMarketOpen()) this.loadData();
+          }, NepseAPI.CACHE_MAX_AGE_MS);
+        },
+
+        async loadData() {
+          this.loading = true;
+          const result = await NepseAPI.getMarketData();
+          this.marketOpen = result.marketOpen;
+          this.lastUpdated = result.lastUpdated;
+
+          if (result.data) {
+            this.allStocks = Object.values(result.data.stocks);
+            this.overview = {
+              stockCount: result.data.stockCount,
+              turnover: result.data.overall.t ? this.fmtCompact(Number(result.data.overall.t)) : '—',
+              totalQty: result.data.overall.q ? this.fmtInt(Number(result.data.overall.q)) : '—',
+              transactions: result.data.overall.tn ? this.fmtInt(Number(result.data.overall.tn)) : '—',
+            };
+          }
+          this.loading = false;
+        },
+
+        async refresh(force = false) {
+          this.loading = true;
+          const result = await NepseAPI.getMarketData(force);
+          this.marketOpen = result.marketOpen;
+          this.lastUpdated = result.lastUpdated;
+
+          if (result.data) {
+            this.allStocks = Object.values(result.data.stocks);
+            this.overview = {
+              stockCount: result.data.stockCount,
+              turnover: result.data.overall.t ? this.fmtCompact(Number(result.data.overall.t)) : '—',
+              totalQty: result.data.overall.q ? this.fmtInt(Number(result.data.overall.q)) : '—',
+              transactions: result.data.overall.tn ? this.fmtInt(Number(result.data.overall.tn)) : '—',
+            };
+          }
+          this.loading = false;
+        },
+
+        get hasData() {
+          return this.allStocks.length > 0;
+        },
+
+        get lastUpdatedText() {
+          return NepseAPI.formatTimestamp(this.lastUpdated);
+        },
+
+        get filteredStocks() {
+          let list = [...this.allStocks];
+          if (this.searchQuery.trim()) {
+            const q = this.searchQuery.toUpperCase();
+            list = list.filter(s => s.symbol.includes(q));
+          }
+          const dir = this.sortDir === 'asc' ? 1 : -1;
+          list.sort((a, b) => {
+            if (this.sortBy === 'symbol') return dir * a.symbol.localeCompare(b.symbol);
+            return dir * ((a[this.sortBy] || 0) - (b[this.sortBy] || 0));
+          });
+          return list;
+        },
+
+        toggleSort(field) {
+          if (this.sortBy === field) {
+            this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc';
+          } else {
+            this.sortBy = field;
+            this.sortDir = field === 'symbol' ? 'asc' : 'desc';
+          }
+        },
+
+        fmt(n) {
+          if (n == null) return '—';
+          return n.toLocaleString('en-NP', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        },
+
+        fmtInt(n) {
+          if (n == null) return '—';
+          return Math.round(n).toLocaleString('en-NP');
+        },
+
+        fmtCompact(n) {
+          if (n == null) return '—';
+          if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+          if (n >= 1e7) return (n / 1e7).toFixed(2) + 'Cr';
+          if (n >= 1e5) return (n / 1e5).toFixed(2) + 'L';
+          if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+          return n.toFixed(0);
+        },
+      }));
+    });
+  </script>
+
+</body>
+</html>
