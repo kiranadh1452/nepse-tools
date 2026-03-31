@@ -290,7 +290,7 @@ document.addEventListener('alpine:init', () => {
     soldPL(t) {
       const buyCost = calcTotalBuyCost(t.qty, t.buyPrice, this.includeCharges);
       const net = calcNetFromSell(t.qty, t.sellPrice, buyCost, this.includeCharges, this.includeTax, t.holdingDays);
-      return { pl: net - buyCost, netReceived: net };
+      return { pl: net - buyCost, netReceived: net, buyCost };
     },
 
     get realizedSummary() {
