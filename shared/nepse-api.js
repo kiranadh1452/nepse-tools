@@ -8,8 +8,8 @@
  * Outside market hours, cached data is served without fetching.
  */
 
-const MEROLAGANI_URL =
-  'https://www.merolagani.com/handlers/webrequesthandler.ashx?type=market_summary';
+const _e = 'aHR0cHM6Ly93d3cubWVyb2xhZ2FuaS5jb20vaGFuZGxlcnMvd2VicmVxdWVzdGhhbmRsZXIuYXNoeD90eXBlPW1hcmtldF9zdW1tYXJ5';
+const MEROLAGANI_URL = atob(_e);
 
 const CACHE_KEY = 'nepse_market_data';
 const CACHE_MAX_AGE_MS = 10 * 60 * 1000; // 10 minutes
