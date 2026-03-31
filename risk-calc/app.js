@@ -115,8 +115,8 @@ document.addEventListener('alpine:init', () => {
       : localStorage.getItem('nepse_activeTab') || 'quick'),
 
     // Global toggles
-    includeCharges: false,
-    includeTax: false,
+    includeCharges: true,
+    includeTax: true,
     holdingDays: 180,
 
     // Quick mode inputs
@@ -134,6 +134,8 @@ document.addEventListener('alpine:init', () => {
     showStopLoss: true,
     portfolioCustomProfit: '',
     portfolioCustomLoss: '',
+    sortBy: 'date',
+    sortDir: 'desc',
 
     // Modal state
     showAddModal: false,
@@ -262,9 +264,27 @@ document.addEventListener('alpine:init', () => {
 
     // Portfolio methods
     get filteredHoldings() {
-      if (!this.searchQuery.trim()) return this.holdings;
-      const q = this.searchQuery.toLowerCase();
-      return this.holdings.filter(h => h.name.toLowerCase().includes(q));
+      let list = [...this.holdings];
+      if (this.searchQuery.trim()) {
+        const q = this.searchQuery.toLowerCase();
+        list = list.filter(h => h.name.toLowerCase().includes(q));
+      }
+      const dir = this.sortDir === 'asc' ? 1 : -1;
+      list.sort((a, b) => {
+        if (this.sortBy === 'name') return dir * a.name.localeCompare(b.name);
+        if (this.sortBy === 'price') return dir * (a.buyPrice - b.buyPrice);
+        return dir * (a.buyDate < b.buyDate ? -1 : a.buyDate > b.buyDate ? 1 : 0);
+      });
+      return list;
+    },
+
+    toggleSort(field) {
+      if (this.sortBy === field) {
+        this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        this.sortBy = field;
+        this.sortDir = 'asc';
+      }
     },
 
     soldPL(t) {

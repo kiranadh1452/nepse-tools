@@ -243,6 +243,24 @@
             <input type="checkbox" x-model="showStopLoss" class="accent-red-500" /> Stop Loss
           </label>
         </div>
+        <div class="flex items-center gap-1">
+          <span class="text-xs text-muted mr-1">Sort:</span>
+          <button @click="toggleSort('name')"
+            class="text-xs px-2 py-1 rounded transition"
+            :class="sortBy === 'name' ? 'bg-accent/20 text-accent' : 'bg-surface text-gray-400 hover:text-white'">
+            Name <span x-show="sortBy === 'name'" x-text="sortDir === 'asc' ? '↑' : '↓'"></span>
+          </button>
+          <button @click="toggleSort('date')"
+            class="text-xs px-2 py-1 rounded transition"
+            :class="sortBy === 'date' ? 'bg-accent/20 text-accent' : 'bg-surface text-gray-400 hover:text-white'">
+            Date <span x-show="sortBy === 'date'" x-text="sortDir === 'asc' ? '↑' : '↓'"></span>
+          </button>
+          <button @click="toggleSort('price')"
+            class="text-xs px-2 py-1 rounded transition"
+            :class="sortBy === 'price' ? 'bg-accent/20 text-accent' : 'bg-surface text-gray-400 hover:text-white'">
+            Price <span x-show="sortBy === 'price'" x-text="sortDir === 'asc' ? '↑' : '↓'"></span>
+          </button>
+        </div>
         <button @click="openAddModal()"
           class="bg-accent hover:bg-accent/80 text-white text-sm font-medium px-4 py-2 rounded-lg transition flex items-center gap-1.5">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
