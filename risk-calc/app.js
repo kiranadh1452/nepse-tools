@@ -128,6 +128,9 @@ document.addEventListener('alpine:init', () => {
     // Portfolio state
     holdings: [],
     soldTransactions: [],
+    livePrices: {},
+    marketOpen: false,
+    pricesLastUpdated: null,
     searchQuery: '',
     expandedHolding: null,
     showProfitTargets: true,
@@ -147,9 +150,15 @@ document.addEventListener('alpine:init', () => {
     showEditSoldModal: false,
     editSoldForm: { id: '', name: '', qty: '', buyPrice: '', buyDate: '', sellPrice: '', sellDate: '' },
 
-    init() {
+    async init() {
       this.holdings = loadHoldings();
       this.soldTransactions = loadSoldTransactions();
+      await this.loadPrices();
+
+      // Auto-refresh prices every 10 min if market open
+      setInterval(() => {
+        if (window.NepseAPI && NepseAPI.isMarketOpen()) this.loadPrices();
+      }, 10 * 60 * 1000);
 
       // Sync tab to hash and localStorage on change
       this.$watch('activeTab', tab => {
@@ -285,6 +294,37 @@ document.addEventListener('alpine:init', () => {
         this.sortBy = field;
         this.sortDir = 'asc';
       }
+    },
+
+    async loadPrices() {
+      if (!window.NepseAPI) return;
+      const result = await NepseAPI.getMarketData();
+      this.marketOpen = result.marketOpen;
+      this.pricesLastUpdated = result.lastUpdated;
+      if (result.data && result.data.stocks) {
+        this.livePrices = result.data.stocks;
+      }
+    },
+
+    getLivePrice(symbol) {
+      const stock = this.livePrices[symbol.toUpperCase()];
+      return stock ? stock.ltp : null;
+    },
+
+    getLiveChange(symbol) {
+      const stock = this.livePrices[symbol.toUpperCase()];
+      return stock ? stock.change : null;
+    },
+
+    holdingUnrealizedPL(holding) {
+      const ltp = this.getLivePrice(holding.name);
+      if (ltp === null) return null;
+      const buyCost = calcTotalBuyCost(holding.qty, holding.buyPrice, this.includeCharges);
+      const days = daysBetween(holding.buyDate, todayStr());
+      const net = calcNetFromSell(holding.qty, ltp, buyCost, this.includeCharges, this.includeTax, days);
+      const pl = net - buyCost;
+      const pct = buyCost ? (pl / buyCost * 100) : 0;
+      return { pl, pct, ltp };
     },
 
     soldPL(t) {
