@@ -109,8 +109,10 @@ function saveSoldTransactions(sold) {
 // Main Alpine app
 document.addEventListener('alpine:init', () => {
   Alpine.data('riskCalc', () => ({
-    // Tab state
-    activeTab: 'quick',
+    // Tab state — restored from URL hash or localStorage
+    activeTab: (['quick', 'portfolio'].includes(location.hash.slice(1))
+      ? location.hash.slice(1)
+      : localStorage.getItem('nepse_activeTab') || 'quick'),
 
     // Global toggles
     includeCharges: false,
@@ -142,6 +144,18 @@ document.addEventListener('alpine:init', () => {
     init() {
       this.holdings = loadHoldings();
       this.soldTransactions = loadSoldTransactions();
+
+      // Sync tab to hash and localStorage on change
+      this.$watch('activeTab', tab => {
+        localStorage.setItem('nepse_activeTab', tab);
+        history.replaceState(null, '', '#' + tab);
+      });
+
+      // Handle browser back/forward
+      window.addEventListener('hashchange', () => {
+        const hash = location.hash.slice(1);
+        if (['quick', 'portfolio'].includes(hash)) this.activeTab = hash;
+      });
     },
 
     // Quick mode calculations
