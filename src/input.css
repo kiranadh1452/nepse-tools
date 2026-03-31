@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+@source "../index.html";
+@source "../trade-calc/index.html";
+@source "../risk-calc/index.html";
+
+@theme {
+  --color-surface: #0f1117;
+  --color-card: #1a1d27;
+  --color-border: #2a2d3a;
+  --color-muted: #6b7280;
+  --color-accent: #6366f1;
+}
