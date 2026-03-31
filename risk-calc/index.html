@@ -96,6 +96,20 @@
         </div>
       </section>
 
+      <!-- Break-even Price -->
+      <div class="bg-card rounded-xl border border-yellow-500/30 p-4 mb-6 flex items-center justify-between" style="box-shadow: 0 0 15px rgba(234,179,8,0.08);">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-lg bg-yellow-500/15 flex items-center justify-center">
+            <svg class="w-4 h-4 text-yellow-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h7"/></svg>
+          </div>
+          <div>
+            <p class="text-xs text-muted uppercase tracking-wider">Break-even Price</p>
+            <p class="text-lg font-bold text-yellow-400" x-text="'NPR ' + fmt(quickBreakeven)"></p>
+          </div>
+        </div>
+        <p class="text-xs text-muted">Min sell price to recover all costs</p>
+      </div>
+
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
 
         <!-- Profit Targets -->
@@ -290,6 +304,12 @@
                     class="text-xs bg-orange-500/15 border border-orange-500/30 rounded px-3 py-1.5 text-orange-400 hover:bg-orange-500/25 transition">Sell</button>
                   <button @click.stop="if(confirm('Delete this holding?')) deleteHolding(holding.id)"
                     class="text-xs bg-red-500/15 border border-red-500/30 rounded px-3 py-1.5 text-red-400 hover:bg-red-500/25 transition">Delete</button>
+                </div>
+
+                <!-- Break-even -->
+                <div class="flex items-center gap-2 py-1">
+                  <span class="text-xs text-muted uppercase tracking-wider">Break-even:</span>
+                  <span class="text-sm font-bold text-yellow-400" x-text="'NPR ' + fmt(holdingBreakeven(holding))"></span>
                 </div>
 
                 <!-- Profit Targets -->

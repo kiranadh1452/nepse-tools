@@ -53,6 +53,19 @@ function calcNetFromSell(qty, sellPrice, totalBuyCost, includeCharges, includeTa
   return sellAmount - sellCharges - tax;
 }
 
+function calcBreakeven(qty, totalBuyCost, includeCharges) {
+  if (!includeCharges) return totalBuyCost / qty;
+  // Binary search: find sell price where net receivable = totalBuyCost (no profit, so no CGT)
+  let lo = 0, hi = (totalBuyCost / qty) * 3;
+  for (let i = 0; i < 100; i++) {
+    const mid = (lo + hi) / 2;
+    const sellAmt = qty * mid;
+    const net = sellAmt - calcCharges(sellAmt);
+    if (net < totalBuyCost) lo = mid; else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+
 function fmt(n) {
   return n.toLocaleString('en-NP', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
@@ -132,6 +145,16 @@ document.addEventListener('alpine:init', () => {
     },
 
     // Quick mode calculations
+    get quickBreakeven() {
+      const totalBuyCost = calcTotalBuyCost(this.quickQty, this.quickBuyPrice, this.includeCharges);
+      return calcBreakeven(this.quickQty, totalBuyCost, this.includeCharges);
+    },
+
+    holdingBreakeven(holding) {
+      const totalBuyCost = calcTotalBuyCost(holding.qty, holding.buyPrice, this.includeCharges);
+      return calcBreakeven(holding.qty, totalBuyCost, this.includeCharges);
+    },
+
     get quickProfitRows() {
       const margins = [...PROFIT_MARGINS];
       if (this.quickCustomProfit && !margins.includes(Number(this.quickCustomProfit))) {
