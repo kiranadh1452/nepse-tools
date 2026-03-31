@@ -132,6 +132,8 @@ document.addEventListener('alpine:init', () => {
     expandedHolding: null,
     showProfitTargets: true,
     showStopLoss: true,
+    portfolioCustomProfit: '',
+    portfolioCustomLoss: '',
 
     // Modal state
     showAddModal: false,
@@ -213,7 +215,7 @@ document.addEventListener('alpine:init', () => {
       return rows;
     },
 
-    calcTargetRow(qty, buyPrice, margin, type) {
+    calcTargetRow(qty, buyPrice, margin, type, isPortfolio) {
       const totalBuyCost = calcTotalBuyCost(qty, buyPrice, this.includeCharges);
       const perShareCost = totalBuyCost / qty;
 
@@ -253,8 +255,8 @@ document.addEventListener('alpine:init', () => {
         plAmount,
         perShareCost,
         isCustom: type === 'profit'
-          ? Number(this.quickCustomProfit) === margin && !PROFIT_MARGINS.includes(margin)
-          : Number(this.quickCustomLoss) === margin && !LOSS_MARGINS.includes(margin),
+          ? Number(isPortfolio ? this.portfolioCustomProfit : this.quickCustomProfit) === margin && !PROFIT_MARGINS.includes(margin)
+          : Number(isPortfolio ? this.portfolioCustomLoss : this.quickCustomLoss) === margin && !LOSS_MARGINS.includes(margin),
       };
     },
 
@@ -265,23 +267,38 @@ document.addEventListener('alpine:init', () => {
       return this.holdings.filter(h => h.name.toLowerCase().includes(q));
     },
 
+    soldPL(t) {
+      const buyCost = calcTotalBuyCost(t.qty, t.buyPrice, this.includeCharges);
+      const net = calcNetFromSell(t.qty, t.sellPrice, buyCost, this.includeCharges, this.includeTax, t.holdingDays);
+      return { pl: net - buyCost, netReceived: net };
+    },
+
     get realizedSummary() {
       let totalProfit = 0, totalLoss = 0;
       for (const t of this.soldTransactions) {
-        if (t.pl >= 0) totalProfit += t.pl;
-        else totalLoss += t.pl;
+        const { pl } = this.soldPL(t);
+        if (pl >= 0) totalProfit += pl;
+        else totalLoss += pl;
       }
       return { totalProfit, totalLoss, net: totalProfit + totalLoss };
     },
 
     holdingProfitRows(holding) {
       const margins = [...PROFIT_MARGINS];
-      return margins.map(m => this.calcTargetRow(holding.qty, holding.buyPrice, m, 'profit'));
+      if (this.portfolioCustomProfit && !margins.includes(Number(this.portfolioCustomProfit))) {
+        margins.push(Number(this.portfolioCustomProfit));
+        margins.sort((a, b) => a - b);
+      }
+      return margins.map(m => this.calcTargetRow(holding.qty, holding.buyPrice, m, 'profit', true));
     },
 
     holdingLossRows(holding) {
       const margins = [...LOSS_MARGINS];
-      return margins.map(m => this.calcTargetRow(holding.qty, holding.buyPrice, m, 'loss'));
+      if (this.portfolioCustomLoss && !margins.includes(Number(this.portfolioCustomLoss))) {
+        margins.push(Number(this.portfolioCustomLoss));
+        margins.sort((a, b) => a - b);
+      }
+      return margins.map(m => this.calcTargetRow(holding.qty, holding.buyPrice, m, 'loss', true));
     },
 
     holdingDaysHeld(holding) {
