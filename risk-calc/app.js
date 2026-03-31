@@ -140,6 +140,8 @@ document.addEventListener('alpine:init', () => {
     modalForm: { name: '', qty: '', buyPrice: '', buyDate: todayStr() },
     sellForm: { holdingId: '', qty: '', sellPrice: '', sellDate: todayStr() },
     editForm: { id: '', name: '', qty: '', buyPrice: '', buyDate: '' },
+    showEditSoldModal: false,
+    editSoldForm: { id: '', name: '', qty: '', buyPrice: '', buyDate: '', sellPrice: '', sellDate: '' },
 
     init() {
       this.holdings = loadHoldings();
@@ -385,6 +387,40 @@ document.addEventListener('alpine:init', () => {
     deleteSoldTransaction(id) {
       this.soldTransactions = this.soldTransactions.filter(t => t.id !== id);
       saveSoldTransactions(this.soldTransactions);
+    },
+
+    openEditSoldModal(t) {
+      this.editSoldForm = { ...t };
+      this.showEditSoldModal = true;
+    },
+
+    saveEditSold() {
+      const idx = this.soldTransactions.findIndex(t => t.id === this.editSoldForm.id);
+      if (idx === -1) return;
+
+      const f = this.editSoldForm;
+      const qty = Number(f.qty);
+      const buyPrice = Number(f.buyPrice);
+      const sellPrice = Number(f.sellPrice);
+      const days = daysBetween(f.buyDate, f.sellDate);
+
+      const buyCost = calcTotalBuyCost(qty, buyPrice, this.includeCharges);
+      const netFromSell = calcNetFromSell(qty, sellPrice, buyCost, this.includeCharges, this.includeTax, days);
+
+      this.soldTransactions[idx] = {
+        ...this.soldTransactions[idx],
+        name: f.name.toUpperCase(),
+        qty,
+        buyPrice,
+        buyDate: f.buyDate,
+        sellPrice,
+        sellDate: f.sellDate,
+        holdingDays: days,
+        pl: netFromSell - buyCost,
+        netReceived: netFromSell,
+      };
+      saveSoldTransactions(this.soldTransactions);
+      this.showEditSoldModal = false;
     },
 
     fmt,
