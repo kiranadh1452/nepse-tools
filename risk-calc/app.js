@@ -345,6 +345,63 @@ document.addEventListener('alpine:init', () => {
       return { totalProfit, totalLoss, net: totalProfit + totalLoss };
     },
 
+    get consolidatedHoldings() {
+      const grouped = {};
+      for (const h of this.holdings) {
+        const sym = h.name.toUpperCase();
+        if (!grouped[sym]) {
+          grouped[sym] = { symbol: sym, totalQty: 0, totalCost: 0, entries: [] };
+        }
+        const cost = calcTotalBuyCost(h.qty, h.buyPrice, this.includeCharges);
+        grouped[sym].totalQty += h.qty;
+        grouped[sym].totalCost += cost;
+        grouped[sym].entries.push(h);
+      }
+
+      return Object.values(grouped).map(g => {
+        const wacc = g.totalQty ? g.totalCost / g.totalQty : 0;
+        const ltp = this.getLivePrice(g.symbol);
+        let unrealizedPL = null, unrealizedPct = null, currentValue = null;
+        if (ltp !== null) {
+          // Calculate net sell value at LTP for each entry to account for charges/tax correctly
+          let totalNet = 0;
+          for (const h of g.entries) {
+            const buyCost = calcTotalBuyCost(h.qty, h.buyPrice, this.includeCharges);
+            const days = daysBetween(h.buyDate, todayStr());
+            totalNet += calcNetFromSell(h.qty, ltp, buyCost, this.includeCharges, this.includeTax, days);
+          }
+          currentValue = g.totalQty * ltp;
+          unrealizedPL = totalNet - g.totalCost;
+          unrealizedPct = g.totalCost ? (unrealizedPL / g.totalCost * 100) : 0;
+        }
+        const change = this.getLiveChange(g.symbol);
+        return {
+          symbol: g.symbol,
+          totalQty: g.totalQty,
+          wacc,
+          totalCost: g.totalCost,
+          ltp,
+          change,
+          currentValue,
+          unrealizedPL,
+          unrealizedPct,
+        };
+      }).sort((a, b) => a.symbol.localeCompare(b.symbol));
+    },
+
+    get unrealizedSummary() {
+      let totalPL = 0, totalInvested = 0, count = 0;
+      for (const h of this.holdings) {
+        const result = this.holdingUnrealizedPL(h);
+        if (result === null) continue;
+        totalPL += result.pl;
+        totalInvested += calcTotalBuyCost(h.qty, h.buyPrice, this.includeCharges);
+        count++;
+      }
+      const pct = totalInvested ? (totalPL / totalInvested * 100) : 0;
+      return { totalPL, totalInvested, pct, count };
+    },
+
     holdingProfitRows(holding) {
       const margins = [...PROFIT_MARGINS];
       if (this.portfolioCustomProfit && !margins.includes(Number(this.portfolioCustomProfit))) {

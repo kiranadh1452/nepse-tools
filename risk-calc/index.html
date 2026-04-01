@@ -230,6 +230,71 @@
         </section>
       </template>
 
+      <!-- Unrealized P/L Summary -->
+      <template x-if="holdings.length > 0 && unrealizedSummary.count > 0">
+        <section class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+          <div class="bg-card rounded-xl border border-border p-4 text-center">
+            <p class="text-xs text-muted uppercase tracking-wider mb-1">Total Invested</p>
+            <p class="text-xl font-bold text-white" x-text="'NPR ' + fmt(unrealizedSummary.totalInvested)"></p>
+          </div>
+          <div class="bg-card rounded-xl border p-4 text-center" :class="unrealizedSummary.totalPL >= 0 ? 'border-green-500/30' : 'border-red-500/30'">
+            <p class="text-xs text-muted uppercase tracking-wider mb-1">Unrealized P/L</p>
+            <p class="text-xl font-bold" :class="unrealizedSummary.totalPL >= 0 ? 'text-green-400' : 'text-red-400'"
+              x-text="(unrealizedSummary.totalPL >= 0 ? '+' : '') + 'NPR ' + fmt(unrealizedSummary.totalPL)"></p>
+          </div>
+          <div class="bg-card rounded-xl border p-4 text-center" :class="unrealizedSummary.pct >= 0 ? 'border-green-500/30' : 'border-red-500/30'">
+            <p class="text-xs text-muted uppercase tracking-wider mb-1">Unrealized Return</p>
+            <p class="text-xl font-bold" :class="unrealizedSummary.pct >= 0 ? 'text-green-400' : 'text-red-400'"
+              x-text="(unrealizedSummary.pct >= 0 ? '+' : '') + unrealizedSummary.pct.toFixed(2) + '%'"></p>
+          </div>
+        </section>
+      </template>
+
+      <!-- My Holdings (consolidated view) -->
+      <template x-if="consolidatedHoldings.length > 0">
+        <section class="mb-6">
+          <h3 class="text-sm font-semibold text-muted uppercase tracking-wider mb-3">My Holdings</h3>
+          <div class="bg-card rounded-xl border border-border overflow-hidden">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-border text-xs text-muted uppercase tracking-wider">
+                  <th class="text-left px-4 py-2.5">Stock</th>
+                  <th class="text-right px-4 py-2.5">Qty</th>
+                  <th class="text-right px-4 py-2.5">WACC</th>
+                  <th class="text-right px-4 py-2.5">LTP</th>
+                  <th class="text-right px-4 py-2.5">Invested</th>
+                  <th class="text-right px-4 py-2.5">P/L</th>
+                  <th class="text-right px-4 py-2.5">P/L %</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="c in consolidatedHoldings" :key="c.symbol">
+                  <tr class="border-b border-border/50 hover:bg-surface/50 transition">
+                    <td class="px-4 py-2.5">
+                      <span class="font-semibold text-white" x-text="c.symbol"></span>
+                      <template x-if="c.change !== null">
+                        <span class="ml-1.5 text-xs" :class="c.change >= 0 ? 'text-green-400' : 'text-red-400'"
+                          x-text="(c.change >= 0 ? '+' : '') + c.change.toFixed(2) + '%'"></span>
+                      </template>
+                    </td>
+                    <td class="text-right px-4 py-2.5 text-gray-300" x-text="c.totalQty"></td>
+                    <td class="text-right px-4 py-2.5 text-gray-300" x-text="fmt(c.wacc)"></td>
+                    <td class="text-right px-4 py-2.5" :class="c.ltp !== null ? 'text-white font-medium' : 'text-muted'" x-text="c.ltp !== null ? fmt(c.ltp) : '—'"></td>
+                    <td class="text-right px-4 py-2.5 text-gray-300" x-text="fmt(c.totalCost)"></td>
+                    <td class="text-right px-4 py-2.5 font-medium"
+                      :class="c.unrealizedPL === null ? 'text-muted' : c.unrealizedPL >= 0 ? 'text-green-400' : 'text-red-400'"
+                      x-text="c.unrealizedPL === null ? '—' : (c.unrealizedPL >= 0 ? '+' : '') + fmt(c.unrealizedPL)"></td>
+                    <td class="text-right px-4 py-2.5 font-medium"
+                      :class="c.unrealizedPct === null ? 'text-muted' : c.unrealizedPct >= 0 ? 'text-green-400' : 'text-red-400'"
+                      x-text="c.unrealizedPct === null ? '—' : (c.unrealizedPct >= 0 ? '+' : '') + c.unrealizedPct.toFixed(2) + '%'"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </template>
+
       <!-- Controls -->
       <section class="flex flex-wrap items-center gap-3 mb-4">
         <div class="flex-1 min-w-[200px]">
