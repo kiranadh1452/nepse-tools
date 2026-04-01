@@ -140,6 +140,11 @@ document.addEventListener('alpine:init', () => {
     sortBy: 'date',
     sortDir: 'desc',
 
+    // Import state
+    showImportConfirm: false,
+    pendingImportData: null,
+    importPreview: { holdings: 0, sold: 0 },
+
     // Modal state
     showAddModal: false,
     showSellModal: false,
@@ -559,6 +564,55 @@ document.addEventListener('alpine:init', () => {
       };
       saveSoldTransactions(this.soldTransactions);
       this.showEditSoldModal = false;
+    },
+
+    exportPortfolio() {
+      const data = {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        holdings: this.holdings,
+        soldTransactions: this.soldTransactions,
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `nepse-portfolio-${todayStr()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    },
+
+    importPortfolio(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = JSON.parse(e.target.result);
+          if (!Array.isArray(data.holdings) || !Array.isArray(data.soldTransactions)) {
+            alert('Invalid portfolio file. Expected holdings and soldTransactions arrays.');
+            return;
+          }
+          this.pendingImportData = data;
+          this.importPreview = { holdings: data.holdings.length, sold: data.soldTransactions.length };
+          this.showImportConfirm = true;
+        } catch {
+          alert('Failed to parse file. Please select a valid JSON file.');
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = '';
+    },
+
+    confirmImport() {
+      if (!this.pendingImportData) return;
+      this.holdings = this.pendingImportData.holdings;
+      this.soldTransactions = this.pendingImportData.soldTransactions;
+      saveHoldings(this.holdings);
+      saveSoldTransactions(this.soldTransactions);
+      this.pendingImportData = null;
+      this.showImportConfirm = false;
+      this.expandedHolding = null;
     },
 
     fmt,

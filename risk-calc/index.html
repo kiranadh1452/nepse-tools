@@ -520,9 +520,46 @@
           </div>
         </section>
       </template>
+
+      <!-- Export / Import -->
+      <section class="mt-8 pt-6 border-t border-border">
+        <div class="flex flex-wrap items-center gap-3">
+          <button @click="exportPortfolio()"
+            class="bg-surface hover:bg-card text-gray-300 hover:text-white text-sm font-medium px-4 py-2 rounded-lg border border-border transition flex items-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            Export Portfolio
+          </button>
+          <button @click="$refs.importFile.click()"
+            class="bg-surface hover:bg-card text-gray-300 hover:text-white text-sm font-medium px-4 py-2 rounded-lg border border-border transition flex items-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2m4-8l-4-4m0 0l-4 4m4-4v12"/></svg>
+            Import Portfolio
+          </button>
+          <input type="file" accept=".json" x-ref="importFile" class="hidden" @change="importPortfolio($event)" />
+          <span class="text-xs text-muted">JSON format</span>
+        </div>
+      </section>
     </div>
 
   </main>
+
+  <!-- Import Confirm Modal -->
+  <div x-show="showImportConfirm" x-transition.opacity class="fixed inset-0 z-50 flex items-center justify-center modal-overlay" @click.self="showImportConfirm = false">
+    <div class="bg-card border border-border rounded-xl p-6 w-full max-w-md mx-4">
+      <h3 class="text-white font-semibold mb-3">Import Portfolio</h3>
+      <div class="bg-red-500/10 border border-red-500/30 rounded-lg p-3 mb-4">
+        <p class="text-red-400 text-sm font-medium mb-1">Warning: This will overwrite your data</p>
+        <p class="text-gray-400 text-xs">All existing holdings and sold transactions will be replaced with the imported data. This cannot be undone.</p>
+      </div>
+      <p class="text-gray-400 text-sm mb-4">
+        File contains <span class="text-white font-medium" x-text="importPreview.holdings"></span> holdings and
+        <span class="text-white font-medium" x-text="importPreview.sold"></span> sold transactions.
+      </p>
+      <div class="flex justify-end gap-3">
+        <button @click="showImportConfirm = false; pendingImportData = null" class="px-4 py-2 text-sm text-gray-400 hover:text-white transition">Cancel</button>
+        <button @click="confirmImport()" class="bg-red-500 hover:bg-red-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition">Overwrite & Import</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Add Holding Modal -->
   <div x-show="showAddModal" x-transition.opacity class="fixed inset-0 z-50 flex items-center justify-center modal-overlay" @click.self="showAddModal = false">
