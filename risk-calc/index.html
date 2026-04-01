@@ -230,37 +230,18 @@
         </section>
       </template>
 
-      <!-- Unrealized P/L Summary -->
-      <template x-if="holdings.length > 0 && unrealizedSummary.count > 0">
-        <section class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-          <div class="bg-card rounded-xl border border-border p-4 text-center">
-            <p class="text-xs text-muted uppercase tracking-wider mb-1">Total Invested</p>
-            <p class="text-xl font-bold text-white" x-text="'NPR ' + fmt(unrealizedSummary.totalInvested)"></p>
-          </div>
-          <div class="bg-card rounded-xl border p-4 text-center" :class="unrealizedSummary.totalPL >= 0 ? 'border-green-500/30' : 'border-red-500/30'">
-            <p class="text-xs text-muted uppercase tracking-wider mb-1">Unrealized P/L</p>
-            <p class="text-xl font-bold" :class="unrealizedSummary.totalPL >= 0 ? 'text-green-400' : 'text-red-400'"
-              x-text="(unrealizedSummary.totalPL >= 0 ? '+' : '') + 'NPR ' + fmt(unrealizedSummary.totalPL)"></p>
-          </div>
-          <div class="bg-card rounded-xl border p-4 text-center" :class="unrealizedSummary.pct >= 0 ? 'border-green-500/30' : 'border-red-500/30'">
-            <p class="text-xs text-muted uppercase tracking-wider mb-1">Unrealized Return</p>
-            <p class="text-xl font-bold" :class="unrealizedSummary.pct >= 0 ? 'text-green-400' : 'text-red-400'"
-              x-text="(unrealizedSummary.pct >= 0 ? '+' : '') + unrealizedSummary.pct.toFixed(2) + '%'"></p>
-          </div>
-        </section>
-      </template>
-
       <!-- My Holdings (consolidated view) -->
       <template x-if="consolidatedHoldings.length > 0">
         <section class="mb-6">
           <h3 class="text-sm font-semibold text-muted uppercase tracking-wider mb-3">My Holdings</h3>
-          <div class="bg-card rounded-xl border border-border overflow-hidden">
+          <div class="bg-card rounded-xl border border-border overflow-x-auto">
             <table class="w-full text-sm">
               <thead>
                 <tr class="border-b border-border text-xs text-muted uppercase tracking-wider">
                   <th class="text-left px-4 py-2.5">Stock</th>
                   <th class="text-right px-4 py-2.5">Qty</th>
                   <th class="text-right px-4 py-2.5">WACC</th>
+                  <th class="text-right px-4 py-2.5">B/E</th>
                   <th class="text-right px-4 py-2.5">LTP</th>
                   <th class="text-right px-4 py-2.5">Invested</th>
                   <th class="text-right px-4 py-2.5">P/L</th>
@@ -279,6 +260,7 @@
                     </td>
                     <td class="text-right px-4 py-2.5 text-gray-300" x-text="c.totalQty"></td>
                     <td class="text-right px-4 py-2.5 text-gray-300" x-text="fmt(c.wacc)"></td>
+                    <td class="text-right px-4 py-2.5 text-yellow-400" x-text="fmt(c.breakeven)"></td>
                     <td class="text-right px-4 py-2.5" :class="c.ltp !== null ? 'text-white font-medium' : 'text-muted'" x-text="c.ltp !== null ? fmt(c.ltp) : '—'"></td>
                     <td class="text-right px-4 py-2.5 text-gray-300" x-text="fmt(c.totalCost)"></td>
                     <td class="text-right px-4 py-2.5 font-medium"
@@ -290,6 +272,18 @@
                   </tr>
                 </template>
               </tbody>
+              <tfoot>
+                <tr class="border-t border-border bg-surface/50">
+                  <td class="px-4 py-2.5 font-semibold text-white" colspan="5">Total</td>
+                  <td class="text-right px-4 py-2.5 font-semibold text-white" x-text="fmt(unrealizedSummary.totalInvested)"></td>
+                  <td class="text-right px-4 py-2.5 font-semibold"
+                    :class="unrealizedSummary.totalPL >= 0 ? 'text-green-400' : 'text-red-400'"
+                    x-text="(unrealizedSummary.totalPL >= 0 ? '+' : '') + fmt(unrealizedSummary.totalPL)"></td>
+                  <td class="text-right px-4 py-2.5 font-semibold"
+                    :class="unrealizedSummary.pct >= 0 ? 'text-green-400' : 'text-red-400'"
+                    x-text="(unrealizedSummary.pct >= 0 ? '+' : '') + unrealizedSummary.pct.toFixed(2) + '%'"></td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </section>

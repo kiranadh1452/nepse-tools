@@ -360,6 +360,7 @@ document.addEventListener('alpine:init', () => {
 
       return Object.values(grouped).map(g => {
         const wacc = g.totalQty ? g.totalCost / g.totalQty : 0;
+        const breakeven = calcBreakeven(g.totalQty, g.totalCost, this.includeCharges);
         const ltp = this.getLivePrice(g.symbol);
         let unrealizedPL = null, unrealizedPct = null, currentValue = null;
         if (ltp !== null) {
@@ -379,6 +380,7 @@ document.addEventListener('alpine:init', () => {
           symbol: g.symbol,
           totalQty: g.totalQty,
           wacc,
+          breakeven,
           totalCost: g.totalCost,
           ltp,
           change,
