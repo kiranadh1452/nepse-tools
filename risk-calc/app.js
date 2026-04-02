@@ -106,11 +106,31 @@ function saveSoldTransactions(sold) {
   localStorage.setItem('nepse_sold', JSON.stringify(sold));
 }
 
+function loadIPOHoldings() {
+  try {
+    return JSON.parse(localStorage.getItem('nepse_ipo_holdings') || '[]');
+  } catch { return []; }
+}
+
+function saveIPOHoldings(holdings) {
+  localStorage.setItem('nepse_ipo_holdings', JSON.stringify(holdings));
+}
+
+function loadIPOSold() {
+  try {
+    return JSON.parse(localStorage.getItem('nepse_ipo_sold') || '[]');
+  } catch { return []; }
+}
+
+function saveIPOSold(sold) {
+  localStorage.setItem('nepse_ipo_sold', JSON.stringify(sold));
+}
+
 // Main Alpine app
 document.addEventListener('alpine:init', () => {
   Alpine.data('riskCalc', () => ({
     // Tab state — restored from URL hash or localStorage
-    activeTab: (['quick', 'portfolio'].includes(location.hash.slice(1))
+    activeTab: (['quick', 'portfolio', 'ipo'].includes(location.hash.slice(1))
       ? location.hash.slice(1)
       : localStorage.getItem('nepse_activeTab') || 'quick'),
 
@@ -128,6 +148,7 @@ document.addEventListener('alpine:init', () => {
     // Portfolio state
     holdings: [],
     soldTransactions: [],
+    includeIPOs: false,
     livePrices: {},
     marketOpen: false,
     pricesLastUpdated: null,
@@ -139,6 +160,22 @@ document.addEventListener('alpine:init', () => {
     portfolioCustomLoss: '',
     sortBy: 'date',
     sortDir: 'desc',
+
+    // IPO state
+    ipoHoldings: [],
+    ipoSoldTransactions: [],
+    ipoSearchQuery: '',
+    ipoExpandedHolding: null,
+
+    // IPO Modal state
+    showIPOAddModal: false,
+    showIPOSellModal: false,
+    showIPOEditModal: false,
+    showIPOEditSoldModal: false,
+    ipoModalForm: { name: '', qty: '', buyPrice: '', buyDate: todayStr() },
+    ipoSellForm: { holdingId: '', qty: '', sellPrice: '', sellDate: todayStr() },
+    ipoEditForm: { id: '', name: '', qty: '', buyPrice: '', buyDate: '' },
+    ipoEditSoldForm: { id: '', name: '', qty: '', buyPrice: '', buyDate: '', sellPrice: '', sellDate: '' },
 
     // Import state
     showImportConfirm: false,
@@ -158,6 +195,8 @@ document.addEventListener('alpine:init', () => {
     async init() {
       this.holdings = loadHoldings();
       this.soldTransactions = loadSoldTransactions();
+      this.ipoHoldings = loadIPOHoldings();
+      this.ipoSoldTransactions = loadIPOSold();
       await this.loadPrices();
 
       // Auto-refresh prices every 10 min if market open
@@ -174,7 +213,7 @@ document.addEventListener('alpine:init', () => {
       // Handle browser back/forward
       window.addEventListener('hashchange', () => {
         const hash = location.hash.slice(1);
-        if (['quick', 'portfolio'].includes(hash)) this.activeTab = hash;
+        if (['quick', 'portfolio', 'ipo'].includes(hash)) this.activeTab = hash;
       });
     },
 
@@ -348,12 +387,20 @@ document.addEventListener('alpine:init', () => {
         if (pl >= 0) totalProfit += pl;
         else totalLoss += pl;
       }
+      if (this.includeIPOs) {
+        for (const t of this.ipoSoldTransactions) {
+          const { pl } = this.soldPL(t);
+          if (pl >= 0) totalProfit += pl;
+          else totalLoss += pl;
+        }
+      }
       return { totalProfit, totalLoss, net: totalProfit + totalLoss };
     },
 
     get consolidatedHoldings() {
       const grouped = {};
-      for (const h of this.holdings) {
+      const allHoldings = this.includeIPOs ? [...this.holdings, ...this.ipoHoldings] : this.holdings;
+      for (const h of allHoldings) {
         const sym = h.name.toUpperCase();
         if (!grouped[sym]) {
           grouped[sym] = { symbol: sym, totalQty: 0, totalCost: 0, entries: [] };
@@ -399,7 +446,8 @@ document.addEventListener('alpine:init', () => {
 
     get unrealizedSummary() {
       let totalPL = 0, totalInvested = 0, count = 0;
-      for (const h of this.holdings) {
+      const allHoldings = this.includeIPOs ? [...this.holdings, ...this.ipoHoldings] : this.holdings;
+      for (const h of allHoldings) {
         const result = this.holdingUnrealizedPL(h);
         if (result === null) continue;
         totalPL += result.pl;
@@ -569,12 +617,185 @@ document.addEventListener('alpine:init', () => {
       this.showEditSoldModal = false;
     },
 
+    // === IPO methods ===
+
+    get ipoFilteredHoldings() {
+      let list = [...this.ipoHoldings];
+      if (this.ipoSearchQuery.trim()) {
+        const q = this.ipoSearchQuery.toLowerCase();
+        list = list.filter(h => h.name.toLowerCase().includes(q));
+      }
+      list.sort((a, b) => a.name.localeCompare(b.name) || (a.buyDate < b.buyDate ? -1 : 1));
+      return list;
+    },
+
+    get ipoConsolidatedHoldings() {
+      const grouped = {};
+      for (const h of this.ipoHoldings) {
+        const sym = h.name.toUpperCase();
+        if (!grouped[sym]) {
+          grouped[sym] = { symbol: sym, totalQty: 0, totalCost: 0, entries: [] };
+        }
+        const cost = calcTotalBuyCost(h.qty, h.buyPrice, this.includeCharges);
+        grouped[sym].totalQty += h.qty;
+        grouped[sym].totalCost += cost;
+        grouped[sym].entries.push(h);
+      }
+      return Object.values(grouped).map(g => {
+        const wacc = g.totalQty ? g.totalCost / g.totalQty : 0;
+        const ltp = this.getLivePrice(g.symbol);
+        let unrealizedPL = null, unrealizedPct = null;
+        if (ltp !== null) {
+          let totalNet = 0;
+          for (const h of g.entries) {
+            const buyCost = calcTotalBuyCost(h.qty, h.buyPrice, this.includeCharges);
+            const days = daysBetween(h.buyDate, todayStr());
+            totalNet += calcNetFromSell(h.qty, ltp, buyCost, this.includeCharges, this.includeTax, days);
+          }
+          unrealizedPL = totalNet - g.totalCost;
+          unrealizedPct = g.totalCost ? (unrealizedPL / g.totalCost * 100) : 0;
+        }
+        const change = this.getLiveChange(g.symbol);
+        return { symbol: g.symbol, totalQty: g.totalQty, wacc, totalCost: g.totalCost, ltp, change, unrealizedPL, unrealizedPct };
+      }).sort((a, b) => a.symbol.localeCompare(b.symbol));
+    },
+
+    get ipoUnrealizedSummary() {
+      let totalPL = 0, totalInvested = 0, count = 0;
+      for (const h of this.ipoHoldings) {
+        const result = this.holdingUnrealizedPL(h);
+        if (result === null) continue;
+        totalPL += result.pl;
+        totalInvested += calcTotalBuyCost(h.qty, h.buyPrice, this.includeCharges);
+        count++;
+      }
+      const pct = totalInvested ? (totalPL / totalInvested * 100) : 0;
+      return { totalPL, totalInvested, pct, count };
+    },
+
+    get ipoRealizedSummary() {
+      let totalProfit = 0, totalLoss = 0;
+      for (const t of this.ipoSoldTransactions) {
+        const { pl } = this.soldPL(t);
+        if (pl >= 0) totalProfit += pl;
+        else totalLoss += pl;
+      }
+      return { totalProfit, totalLoss, net: totalProfit + totalLoss };
+    },
+
+    openIPOAddModal() {
+      this.ipoModalForm = { name: '', qty: '', buyPrice: '', buyDate: todayStr() };
+      this.showIPOAddModal = true;
+    },
+
+    addIPOHolding() {
+      if (!this.ipoModalForm.name || !this.ipoModalForm.qty || !this.ipoModalForm.buyPrice) return;
+      this.ipoHoldings.push({
+        id: generateId(),
+        name: this.ipoModalForm.name.toUpperCase(),
+        qty: Number(this.ipoModalForm.qty),
+        buyPrice: Number(this.ipoModalForm.buyPrice),
+        buyDate: this.ipoModalForm.buyDate || todayStr(),
+      });
+      saveIPOHoldings(this.ipoHoldings);
+      this.showIPOAddModal = false;
+    },
+
+    openIPOEditModal(holding) {
+      this.ipoEditForm = { ...holding };
+      this.showIPOEditModal = true;
+    },
+
+    saveIPOEdit() {
+      const idx = this.ipoHoldings.findIndex(h => h.id === this.ipoEditForm.id);
+      if (idx === -1) return;
+      this.ipoHoldings[idx] = {
+        ...this.ipoHoldings[idx],
+        name: this.ipoEditForm.name.toUpperCase(),
+        qty: Number(this.ipoEditForm.qty),
+        buyPrice: Number(this.ipoEditForm.buyPrice),
+        buyDate: this.ipoEditForm.buyDate,
+      };
+      saveIPOHoldings(this.ipoHoldings);
+      this.showIPOEditModal = false;
+    },
+
+    deleteIPOHolding(id) {
+      this.ipoHoldings = this.ipoHoldings.filter(h => h.id !== id);
+      saveIPOHoldings(this.ipoHoldings);
+      if (this.ipoExpandedHolding === id) this.ipoExpandedHolding = null;
+    },
+
+    openIPOSellModal(holding) {
+      this.ipoSellForm = { holdingId: holding.id, qty: holding.qty, sellPrice: '', sellDate: todayStr() };
+      this.showIPOSellModal = true;
+    },
+
+    confirmIPOSell() {
+      const holding = this.ipoHoldings.find(h => h.id === this.ipoSellForm.holdingId);
+      if (!holding || !this.ipoSellForm.qty || !this.ipoSellForm.sellPrice) return;
+
+      const sellQty = Math.min(Number(this.ipoSellForm.qty), holding.qty);
+      const sellPrice = Number(this.ipoSellForm.sellPrice);
+      const sellDate = this.ipoSellForm.sellDate || todayStr();
+      const days = daysBetween(holding.buyDate, sellDate);
+      const buyCost = calcTotalBuyCost(sellQty, holding.buyPrice, this.includeCharges);
+      const netFromSell = calcNetFromSell(sellQty, sellPrice, buyCost, this.includeCharges, this.includeTax, days);
+
+      this.ipoSoldTransactions.push({
+        id: generateId(), name: holding.name, qty: sellQty,
+        buyPrice: holding.buyPrice, buyDate: holding.buyDate,
+        sellPrice, sellDate, holdingDays: days,
+        pl: netFromSell - buyCost, netReceived: netFromSell,
+      });
+      saveIPOSold(this.ipoSoldTransactions);
+
+      const remaining = holding.qty - sellQty;
+      if (remaining <= 0) {
+        this.ipoHoldings = this.ipoHoldings.filter(h => h.id !== holding.id);
+        if (this.ipoExpandedHolding === holding.id) this.ipoExpandedHolding = null;
+      } else {
+        holding.qty = remaining;
+      }
+      saveIPOHoldings(this.ipoHoldings);
+      this.showIPOSellModal = false;
+    },
+
+    deleteIPOSoldTransaction(id) {
+      this.ipoSoldTransactions = this.ipoSoldTransactions.filter(t => t.id !== id);
+      saveIPOSold(this.ipoSoldTransactions);
+    },
+
+    openIPOEditSoldModal(t) {
+      this.ipoEditSoldForm = { ...t };
+      this.showIPOEditSoldModal = true;
+    },
+
+    saveIPOEditSold() {
+      const idx = this.ipoSoldTransactions.findIndex(t => t.id === this.ipoEditSoldForm.id);
+      if (idx === -1) return;
+      const f = this.ipoEditSoldForm;
+      const qty = Number(f.qty), buyPrice = Number(f.buyPrice), sellPrice = Number(f.sellPrice);
+      const days = daysBetween(f.buyDate, f.sellDate);
+      const buyCost = calcTotalBuyCost(qty, buyPrice, this.includeCharges);
+      const netFromSell = calcNetFromSell(qty, sellPrice, buyCost, this.includeCharges, this.includeTax, days);
+      this.ipoSoldTransactions[idx] = {
+        ...this.ipoSoldTransactions[idx], name: f.name.toUpperCase(), qty, buyPrice,
+        buyDate: f.buyDate, sellPrice, sellDate: f.sellDate, holdingDays: days,
+        pl: netFromSell - buyCost, netReceived: netFromSell,
+      };
+      saveIPOSold(this.ipoSoldTransactions);
+      this.showIPOEditSoldModal = false;
+    },
+
     exportPortfolio() {
       const data = {
-        version: 1,
+        version: 2,
         exportedAt: new Date().toISOString(),
         holdings: this.holdings,
         soldTransactions: this.soldTransactions,
+        ipoHoldings: this.ipoHoldings,
+        ipoSoldTransactions: this.ipoSoldTransactions,
       };
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -597,7 +818,9 @@ document.addEventListener('alpine:init', () => {
             return;
           }
           this.pendingImportData = data;
-          this.importPreview = { holdings: data.holdings.length, sold: data.soldTransactions.length };
+          const ipoH = Array.isArray(data.ipoHoldings) ? data.ipoHoldings.length : 0;
+          const ipoS = Array.isArray(data.ipoSoldTransactions) ? data.ipoSoldTransactions.length : 0;
+          this.importPreview = { holdings: data.holdings.length, sold: data.soldTransactions.length, ipoHoldings: ipoH, ipoSold: ipoS };
           this.showImportConfirm = true;
         } catch {
           alert('Failed to parse file. Please select a valid JSON file.');
@@ -611,11 +834,16 @@ document.addEventListener('alpine:init', () => {
       if (!this.pendingImportData) return;
       this.holdings = this.pendingImportData.holdings;
       this.soldTransactions = this.pendingImportData.soldTransactions;
+      this.ipoHoldings = Array.isArray(this.pendingImportData.ipoHoldings) ? this.pendingImportData.ipoHoldings : [];
+      this.ipoSoldTransactions = Array.isArray(this.pendingImportData.ipoSoldTransactions) ? this.pendingImportData.ipoSoldTransactions : [];
       saveHoldings(this.holdings);
       saveSoldTransactions(this.soldTransactions);
+      saveIPOHoldings(this.ipoHoldings);
+      saveIPOSold(this.ipoSoldTransactions);
       this.pendingImportData = null;
       this.showImportConfirm = false;
       this.expandedHolding = null;
+      this.ipoExpandedHolding = null;
     },
 
     fmt,

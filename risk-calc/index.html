@@ -33,6 +33,7 @@
     <div class="border-b border-border flex gap-1">
       <button class="tab-btn" :class="{ active: activeTab === 'quick' }" @click="activeTab = 'quick'">Quick Mode</button>
       <button class="tab-btn" :class="{ active: activeTab === 'portfolio' }" @click="activeTab = 'portfolio'">Portfolio</button>
+      <button class="tab-btn" :class="{ active: activeTab === 'ipo' }" @click="activeTab = 'ipo'">IPO</button>
     </div>
 
     <!-- Global Toggles -->
@@ -228,6 +229,16 @@
               x-text="(realizedSummary.net >= 0 ? '+' : '') + 'NPR ' + fmt(realizedSummary.net)"></p>
           </div>
         </section>
+      </template>
+
+      <!-- Include IPOs toggle -->
+      <template x-if="ipoHoldings.length > 0 || ipoSoldTransactions.length > 0">
+        <div class="flex items-center gap-2 mb-4">
+          <div class="toggle-track" :class="{ on: includeIPOs }" @click="includeIPOs = !includeIPOs" style="transform: scale(0.85);">
+            <div class="toggle-knob"></div>
+          </div>
+          <span class="text-sm text-gray-400">Include IPOs in P/L</span>
+        </div>
       </template>
 
       <!-- My Holdings (consolidated view) -->
@@ -543,6 +554,217 @@
       </section>
     </div>
 
+    <!-- ========== IPO MODE ========== -->
+    <div x-show="activeTab === 'ipo'" x-transition>
+
+      <!-- IPO Realized P/L Summary -->
+      <template x-if="ipoSoldTransactions.length > 0">
+        <section class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+          <div class="bg-card rounded-xl border border-green-500/30 p-4 text-center" style="box-shadow: 0 0 15px rgba(34,197,94,0.1);">
+            <p class="text-xs text-muted uppercase tracking-wider mb-1">IPO Profit</p>
+            <p class="text-xl font-bold text-green-400" x-text="'NPR ' + fmt(ipoRealizedSummary.totalProfit)"></p>
+          </div>
+          <div class="bg-card rounded-xl border border-red-500/30 p-4 text-center" style="box-shadow: 0 0 15px rgba(239,68,68,0.1);">
+            <p class="text-xs text-muted uppercase tracking-wider mb-1">IPO Loss</p>
+            <p class="text-xl font-bold text-red-400" x-text="'NPR ' + fmt(ipoRealizedSummary.totalLoss)"></p>
+          </div>
+          <div class="bg-card rounded-xl border p-4 text-center" :class="ipoRealizedSummary.net >= 0 ? 'border-green-500/30' : 'border-red-500/30'">
+            <p class="text-xs text-muted uppercase tracking-wider mb-1">Net IPO P/L</p>
+            <p class="text-xl font-bold" :class="ipoRealizedSummary.net >= 0 ? 'text-green-400' : 'text-red-400'"
+              x-text="(ipoRealizedSummary.net >= 0 ? '+' : '') + 'NPR ' + fmt(ipoRealizedSummary.net)"></p>
+          </div>
+        </section>
+      </template>
+
+      <!-- IPO Consolidated Holdings -->
+      <template x-if="ipoConsolidatedHoldings.length > 0">
+        <section class="mb-6">
+          <h3 class="text-sm font-semibold text-muted uppercase tracking-wider mb-3">IPO Holdings</h3>
+          <div class="bg-card rounded-xl border border-border overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-border text-xs text-muted uppercase tracking-wider">
+                  <th class="text-left px-4 py-2.5">Stock</th>
+                  <th class="text-right px-4 py-2.5">Qty</th>
+                  <th class="text-right px-4 py-2.5">WACC</th>
+                  <th class="text-right px-4 py-2.5">LTP</th>
+                  <th class="text-right px-4 py-2.5">Invested</th>
+                  <th class="text-right px-4 py-2.5">P/L</th>
+                  <th class="text-right px-4 py-2.5">P/L %</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="c in ipoConsolidatedHoldings" :key="c.symbol">
+                  <tr class="border-b border-border/50 hover:bg-surface/50 transition">
+                    <td class="px-4 py-2.5">
+                      <span class="font-semibold text-white" x-text="c.symbol"></span>
+                      <template x-if="c.change !== null">
+                        <span class="ml-1.5 text-xs" :class="c.change >= 0 ? 'text-green-400' : 'text-red-400'"
+                          x-text="(c.change >= 0 ? '+' : '') + c.change.toFixed(2) + '%'"></span>
+                      </template>
+                    </td>
+                    <td class="text-right px-4 py-2.5 text-gray-300" x-text="c.totalQty"></td>
+                    <td class="text-right px-4 py-2.5 text-gray-300" x-text="fmt(c.wacc)"></td>
+                    <td class="text-right px-4 py-2.5" :class="c.ltp !== null ? 'text-white font-medium' : 'text-muted'" x-text="c.ltp !== null ? fmt(c.ltp) : '—'"></td>
+                    <td class="text-right px-4 py-2.5 text-gray-300" x-text="fmt(c.totalCost)"></td>
+                    <td class="text-right px-4 py-2.5 font-medium"
+                      :class="c.unrealizedPL === null ? 'text-muted' : c.unrealizedPL >= 0 ? 'text-green-400' : 'text-red-400'"
+                      x-text="c.unrealizedPL === null ? '—' : (c.unrealizedPL >= 0 ? '+' : '') + fmt(c.unrealizedPL)"></td>
+                    <td class="text-right px-4 py-2.5 font-medium"
+                      :class="c.unrealizedPct === null ? 'text-muted' : c.unrealizedPct >= 0 ? 'text-green-400' : 'text-red-400'"
+                      x-text="c.unrealizedPct === null ? '—' : (c.unrealizedPct >= 0 ? '+' : '') + c.unrealizedPct.toFixed(2) + '%'"></td>
+                  </tr>
+                </template>
+              </tbody>
+              <tfoot x-show="ipoUnrealizedSummary.count > 0">
+                <tr class="border-t border-border bg-surface/50">
+                  <td class="px-4 py-2.5 font-semibold text-white" colspan="4">Total</td>
+                  <td class="text-right px-4 py-2.5 font-semibold text-white" x-text="fmt(ipoUnrealizedSummary.totalInvested)"></td>
+                  <td class="text-right px-4 py-2.5 font-semibold"
+                    :class="ipoUnrealizedSummary.totalPL >= 0 ? 'text-green-400' : 'text-red-400'"
+                    x-text="(ipoUnrealizedSummary.totalPL >= 0 ? '+' : '') + fmt(ipoUnrealizedSummary.totalPL)"></td>
+                  <td class="text-right px-4 py-2.5 font-semibold"
+                    :class="ipoUnrealizedSummary.pct >= 0 ? 'text-green-400' : 'text-red-400'"
+                    x-text="(ipoUnrealizedSummary.pct >= 0 ? '+' : '') + ipoUnrealizedSummary.pct.toFixed(2) + '%'"></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </section>
+      </template>
+
+      <!-- IPO Controls -->
+      <section class="flex flex-wrap items-center gap-3 mb-4">
+        <div class="flex-1 min-w-[200px]">
+          <input type="text" x-model="ipoSearchQuery" placeholder="Search IPO holdings..."
+            class="w-full bg-card border border-border rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent/60" />
+        </div>
+        <button @click="openIPOAddModal()"
+          class="bg-accent hover:bg-accent/80 text-white text-sm font-medium px-4 py-2 rounded-lg transition flex items-center gap-1.5">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+          Add IPO
+        </button>
+      </section>
+
+      <!-- IPO Holdings List -->
+      <section class="space-y-3 mb-8">
+        <template x-if="ipoFilteredHoldings.length === 0">
+          <div class="bg-card rounded-xl border border-border p-10 text-center">
+            <p class="text-muted text-sm">No IPO holdings yet. Click "Add IPO" to get started.</p>
+          </div>
+        </template>
+
+        <template x-for="holding in ipoFilteredHoldings" :key="holding.id">
+          <div class="bg-card rounded-xl border border-border overflow-hidden">
+            <!-- IPO Holding Header -->
+            <div class="px-5 py-3 flex items-center justify-between cursor-pointer hover:bg-surface/30 transition"
+              @click="ipoExpandedHolding = ipoExpandedHolding === holding.id ? null : holding.id">
+              <div class="flex items-center gap-4">
+                <svg class="w-4 h-4 text-muted transition-transform" :class="{ 'rotate-90': ipoExpandedHolding === holding.id }"
+                  fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                <div>
+                  <span class="font-semibold text-white" x-text="holding.name"></span>
+                  <span class="text-xs text-muted ml-2" x-text="holding.qty + ' shares @ NPR ' + fmt(holding.buyPrice)"></span>
+                  <template x-if="getLivePrice(holding.name) !== null">
+                    <span class="ml-2 text-xs">
+                      <span class="text-gray-400">LTP:</span>
+                      <span class="text-white font-medium" x-text="fmt(getLivePrice(holding.name))"></span>
+                      <span :class="getLiveChange(holding.name) >= 0 ? 'text-green-400' : 'text-red-400'"
+                        x-text="(getLiveChange(holding.name) >= 0 ? '+' : '') + getLiveChange(holding.name).toFixed(2) + '%'"></span>
+                    </span>
+                  </template>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 text-xs">
+                <template x-if="holdingUnrealizedPL(holding) !== null">
+                  <span class="font-medium"
+                    :class="holdingUnrealizedPL(holding).pl >= 0 ? 'text-green-400' : 'text-red-400'"
+                    x-text="(holdingUnrealizedPL(holding).pl >= 0 ? '+' : '') + fmt(holdingUnrealizedPL(holding).pl) + ' (' + holdingUnrealizedPL(holding).pct.toFixed(2) + '%)'"></span>
+                </template>
+                <span class="text-muted" x-text="holding.buyDate"></span>
+              </div>
+            </div>
+
+            <!-- IPO Accordion Body -->
+            <div class="accordion-body" :class="{ open: ipoExpandedHolding === holding.id }">
+              <div class="px-5 pb-4 pt-1 border-t border-border/60 space-y-4">
+                <div class="flex gap-2 pt-2">
+                  <button @click.stop="openIPOEditModal(holding)"
+                    class="text-xs bg-surface border border-border rounded px-3 py-1.5 text-gray-300 hover:text-white transition">Edit</button>
+                  <button @click.stop="openIPOSellModal(holding)"
+                    class="text-xs bg-orange-500/15 border border-orange-500/30 rounded px-3 py-1.5 text-orange-400 hover:bg-orange-500/25 transition">Sell</button>
+                  <button @click.stop="if(confirm('Delete this IPO holding?')) deleteIPOHolding(holding.id)"
+                    class="text-xs bg-red-500/15 border border-red-500/30 rounded px-3 py-1.5 text-red-400 hover:bg-red-500/25 transition">Delete</button>
+                </div>
+                <div class="flex items-center gap-2 py-1">
+                  <span class="text-xs text-muted uppercase tracking-wider">Break-even:</span>
+                  <span class="text-sm font-bold text-yellow-400" x-text="'NPR ' + fmt(holdingBreakeven(holding))"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+      </section>
+
+      <!-- IPO Sold History -->
+      <template x-if="ipoSoldTransactions.length > 0">
+        <section class="bg-card rounded-xl border border-border overflow-hidden">
+          <div class="px-5 py-3 border-b border-border flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-gray-500"></span>
+            <h3 class="text-sm font-semibold text-white">IPO Sold Transactions</h3>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-border/60 text-gray-400">
+                  <th class="px-4 py-2 text-left font-medium">Stock</th>
+                  <th class="px-4 py-2 text-right font-medium">Qty</th>
+                  <th class="px-4 py-2 text-right font-medium">Buy</th>
+                  <th class="px-4 py-2 text-right font-medium">Sell</th>
+                  <th class="px-4 py-2 text-right font-medium">Days</th>
+                  <th class="px-4 py-2 text-right font-medium">P/L</th>
+                  <th class="px-4 py-2 text-right font-medium">P/L %</th>
+                  <th class="px-4 py-2 text-center font-medium"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="t in ipoSoldTransactions" :key="t.id">
+                  <tr class="border-b border-border/60">
+                    <td class="px-4 py-2 text-white font-medium">
+                      <span x-text="t.name"></span>
+                      <span class="text-xs text-muted block" x-text="t.buyDate + ' → ' + t.sellDate"></span>
+                    </td>
+                    <td class="px-4 py-2 text-right text-gray-300" x-text="t.qty"></td>
+                    <td class="px-4 py-2 text-right text-gray-300" x-text="fmt(t.buyPrice)"></td>
+                    <td class="px-4 py-2 text-right text-gray-300" x-text="fmt(t.sellPrice)"></td>
+                    <td class="px-4 py-2 text-right text-gray-400" x-text="t.holdingDays"></td>
+                    <td class="px-4 py-2 text-right font-medium"
+                      :class="soldPL(t).pl >= 0 ? 'text-green-400' : 'text-red-400'"
+                      x-text="(soldPL(t).pl >= 0 ? '+' : '') + fmt(soldPL(t).pl)"></td>
+                    <td class="px-4 py-2 text-right font-medium"
+                      :class="soldPL(t).plPercent >= 0 ? 'text-green-400' : 'text-red-400'"
+                      x-text="(soldPL(t).plPercent >= 0 ? '+' : '') + soldPL(t).plPercent.toFixed(2) + '%'"></td>
+                    <td class="px-4 py-2 text-center">
+                      <div class="flex items-center justify-center gap-2">
+                        <button @click="openIPOEditSoldModal(t)"
+                          class="text-gray-400/50 hover:text-white transition" title="Edit">
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                        </button>
+                        <button @click="if(confirm('Delete this record?')) deleteIPOSoldTransaction(t.id)"
+                          class="text-red-400/50 hover:text-red-400 transition" title="Delete">
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </template>
+    </div>
+
   </main>
 
   <!-- Import Confirm Modal -->
@@ -554,8 +776,10 @@
         <p class="text-gray-400 text-xs">All existing holdings and sold transactions will be replaced with the imported data. This cannot be undone.</p>
       </div>
       <p class="text-gray-400 text-sm mb-4">
-        File contains <span class="text-white font-medium" x-text="importPreview.holdings"></span> holdings and
-        <span class="text-white font-medium" x-text="importPreview.sold"></span> sold transactions.
+        File contains <span class="text-white font-medium" x-text="importPreview.holdings"></span> holdings,
+        <span class="text-white font-medium" x-text="importPreview.sold"></span> sold transactions,
+        <span class="text-white font-medium" x-text="importPreview.ipoHoldings || 0"></span> IPO holdings, and
+        <span class="text-white font-medium" x-text="importPreview.ipoSold || 0"></span> IPO sold transactions.
       </p>
       <div class="flex justify-end gap-3">
         <button @click="showImportConfirm = false; pendingImportData = null" class="px-4 py-2 text-sm text-gray-400 hover:text-white transition">Cancel</button>
@@ -707,6 +931,153 @@
       <div class="flex justify-end gap-2 mt-5">
         <button @click="showEditSoldModal = false" class="px-4 py-2 text-sm text-gray-400 hover:text-white transition">Cancel</button>
         <button @click="saveEditSold()" class="bg-accent hover:bg-accent/80 text-white text-sm font-medium px-4 py-2 rounded-lg transition">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- IPO Add Modal -->
+  <div x-show="showIPOAddModal" x-transition.opacity class="fixed inset-0 z-50 flex items-center justify-center modal-overlay" @click.self="showIPOAddModal = false">
+    <div class="bg-card border border-border rounded-xl p-6 w-full max-w-md mx-4" @click.stop>
+      <h3 class="text-white font-semibold mb-4">Add IPO Holding</h3>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Stock Name / Symbol</label>
+          <input type="text" x-model="ipoModalForm.name" placeholder="e.g. NABIL"
+            class="w-full bg-surface border border-border rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent/60" />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Quantity</label>
+            <input type="number" x-model="ipoModalForm.qty" min="1"
+              class="w-full bg-surface border border-border rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent/60" />
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">IPO Price</label>
+            <input type="number" x-model="ipoModalForm.buyPrice" min="0" step="0.01"
+              class="w-full bg-surface border border-border rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent/60" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Allotment Date</label>
+          <input type="date" x-model="ipoModalForm.buyDate"
+            class="w-full bg-surface border border-border rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent/60" />
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 mt-5">
+        <button @click="showIPOAddModal = false" class="px-4 py-2 text-sm text-gray-400 hover:text-white transition">Cancel</button>
+        <button @click="addIPOHolding()" class="bg-accent hover:bg-accent/80 text-white text-sm font-medium px-4 py-2 rounded-lg transition">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- IPO Edit Modal -->
+  <div x-show="showIPOEditModal" x-transition.opacity class="fixed inset-0 z-50 flex items-center justify-center modal-overlay" @click.self="showIPOEditModal = false">
+    <div class="bg-card border border-border rounded-xl p-6 w-full max-w-md mx-4" @click.stop>
+      <h3 class="text-white font-semibold mb-4">Edit IPO Holding</h3>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Stock Name / Symbol</label>
+          <input type="text" x-model="ipoEditForm.name"
+            class="w-full bg-surface border border-border rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent/60" />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Quantity</label>
+            <input type="number" x-model="ipoEditForm.qty" min="1"
+              class="w-full bg-surface border border-border rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent/60" />
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">IPO Price</label>
+            <input type="number" x-model="ipoEditForm.buyPrice" min="0" step="0.01"
+              class="w-full bg-surface border border-border rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent/60" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Allotment Date</label>
+          <input type="date" x-model="ipoEditForm.buyDate"
+            class="w-full bg-surface border border-border rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent/60" />
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 mt-5">
+        <button @click="showIPOEditModal = false" class="px-4 py-2 text-sm text-gray-400 hover:text-white transition">Cancel</button>
+        <button @click="saveIPOEdit()" class="bg-accent hover:bg-accent/80 text-white text-sm font-medium px-4 py-2 rounded-lg transition">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- IPO Sell Modal -->
+  <div x-show="showIPOSellModal" x-transition.opacity class="fixed inset-0 z-50 flex items-center justify-center modal-overlay" @click.self="showIPOSellModal = false">
+    <div class="bg-card border border-border rounded-xl p-6 w-full max-w-md mx-4" @click.stop>
+      <h3 class="text-white font-semibold mb-4">Sell IPO Shares</h3>
+      <div class="space-y-3">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Quantity to Sell</label>
+            <input type="number" x-model="ipoSellForm.qty" min="1"
+              class="w-full bg-surface border border-border rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent/60" />
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Sell Price</label>
+            <input type="number" x-model="ipoSellForm.sellPrice" min="0" step="0.01"
+              class="w-full bg-surface border border-border rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent/60" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Sell Date</label>
+          <input type="date" x-model="ipoSellForm.sellDate"
+            class="w-full bg-surface border border-border rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent/60" />
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 mt-5">
+        <button @click="showIPOSellModal = false" class="px-4 py-2 text-sm text-gray-400 hover:text-white transition">Cancel</button>
+        <button @click="confirmIPOSell()" class="bg-orange-500 hover:bg-orange-500/80 text-white text-sm font-medium px-4 py-2 rounded-lg transition">Confirm Sell</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- IPO Edit Sold Modal -->
+  <div x-show="showIPOEditSoldModal" x-transition.opacity class="fixed inset-0 z-50 flex items-center justify-center modal-overlay" @click.self="showIPOEditSoldModal = false">
+    <div class="bg-card border border-border rounded-xl p-6 w-full max-w-md mx-4" @click.stop>
+      <h3 class="text-white font-semibold mb-4">Edit IPO Sold Transaction</h3>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Stock Name</label>
+          <input type="text" x-model="ipoEditSoldForm.name"
+            class="w-full bg-surface border border-border rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent/60" />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Quantity</label>
+            <input type="number" x-model="ipoEditSoldForm.qty" min="1"
+              class="w-full bg-surface border border-border rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent/60" />
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">IPO Price</label>
+            <input type="number" x-model="ipoEditSoldForm.buyPrice" min="0" step="0.01"
+              class="w-full bg-surface border border-border rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent/60" />
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Allotment Date</label>
+            <input type="date" x-model="ipoEditSoldForm.buyDate"
+              class="w-full bg-surface border border-border rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent/60" />
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Sell Date</label>
+            <input type="date" x-model="ipoEditSoldForm.sellDate"
+              class="w-full bg-surface border border-border rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent/60" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Sell Price</label>
+          <input type="number" x-model="ipoEditSoldForm.sellPrice" min="0" step="0.01"
+            class="w-full bg-surface border border-border rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent/60" />
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 mt-5">
+        <button @click="showIPOEditSoldModal = false" class="px-4 py-2 text-sm text-gray-400 hover:text-white transition">Cancel</button>
+        <button @click="saveIPOEditSold()" class="bg-accent hover:bg-accent/80 text-white text-sm font-medium px-4 py-2 rounded-lg transition">Save</button>
       </div>
     </div>
   </div>
