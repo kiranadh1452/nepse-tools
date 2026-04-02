@@ -34,6 +34,7 @@
       <button class="tab-btn" :class="{ active: activeTab === 'quick' }" @click="activeTab = 'quick'">Quick Mode</button>
       <button class="tab-btn" :class="{ active: activeTab === 'portfolio' }" @click="activeTab = 'portfolio'">Portfolio</button>
       <button class="tab-btn" :class="{ active: activeTab === 'ipo' }" @click="activeTab = 'ipo'">IPO</button>
+      <button class="tab-btn" :class="{ active: activeTab === 'costs' }" @click="activeTab = 'costs'">Costs & Tax</button>
     </div>
 
     <!-- Global Toggles -->
@@ -762,6 +763,136 @@
             </table>
           </div>
         </section>
+      </template>
+    </div>
+
+    <!-- ========== COSTS & TAX ========== -->
+    <div x-show="activeTab === 'costs'" x-transition>
+
+      <!-- Include IPOs toggle -->
+      <template x-if="ipoSoldTransactions.length > 0">
+        <div class="flex items-center gap-2 mb-6">
+          <div class="toggle-track" :class="{ on: includeIPOsInCosts }" @click="includeIPOsInCosts = !includeIPOsInCosts" style="transform: scale(0.85);">
+            <div class="toggle-knob"></div>
+          </div>
+          <span class="text-sm text-gray-400">Include IPO transactions</span>
+        </div>
+      </template>
+
+      <template x-if="costBreakdown.transactionCount === 0">
+        <div class="bg-card rounded-xl border border-border p-10 text-center">
+          <p class="text-muted text-sm">No sold transactions yet. Costs and taxes are calculated from completed trades.</p>
+        </div>
+      </template>
+
+      <template x-if="costBreakdown.transactionCount > 0">
+        <div class="space-y-6">
+
+          <!-- Grand Total -->
+          <section class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="bg-card rounded-xl border border-red-500/30 p-5 text-center" style="box-shadow: 0 0 15px rgba(239,68,68,0.1);">
+              <p class="text-xs text-muted uppercase tracking-wider mb-1">Total Costs & Tax Paid</p>
+              <p class="text-2xl font-bold text-red-400" x-text="'NPR ' + fmt(costBreakdown.grandTotal)"></p>
+              <p class="text-xs text-muted mt-1" x-text="'Across ' + costBreakdown.transactionCount + ' transactions'"></p>
+            </div>
+            <div class="bg-card rounded-xl border border-border p-5 text-center">
+              <p class="text-xs text-muted uppercase tracking-wider mb-1">Total Tax Paid (CGT)</p>
+              <p class="text-2xl font-bold text-yellow-400" x-text="'NPR ' + fmt(costBreakdown.totalCGT)"></p>
+              <p class="text-xs text-muted mt-1">
+                <span x-text="'Short-term (7.5%): NPR ' + fmt(costBreakdown.totalCGTShort)"></span>
+                <span class="mx-1">|</span>
+                <span x-text="'Long-term (5%): NPR ' + fmt(costBreakdown.totalCGTLong)"></span>
+              </p>
+            </div>
+          </section>
+
+          <!-- Charges Breakdown -->
+          <section class="bg-card rounded-xl border border-border overflow-hidden">
+            <div class="px-5 py-3 border-b border-border">
+              <h3 class="text-sm font-semibold text-white">Charges Breakdown</h3>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="border-b border-border/60 text-xs text-muted uppercase tracking-wider">
+                    <th class="px-5 py-2.5 text-left">Charge Type</th>
+                    <th class="px-5 py-2.5 text-right">Buy Side</th>
+                    <th class="px-5 py-2.5 text-right">Sell Side</th>
+                    <th class="px-5 py-2.5 text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr class="border-b border-border/40">
+                    <td class="px-5 py-2.5 text-gray-300">Broker Commission</td>
+                    <td class="px-5 py-2.5 text-right text-gray-400" x-text="fmt(costBreakdown.totalBuyCommission)"></td>
+                    <td class="px-5 py-2.5 text-right text-gray-400" x-text="fmt(costBreakdown.totalSellCommission)"></td>
+                    <td class="px-5 py-2.5 text-right text-white font-medium" x-text="fmt(costBreakdown.totalCommission)"></td>
+                  </tr>
+                  <tr class="border-b border-border/40">
+                    <td class="px-5 py-2.5 text-gray-300">SEBON Fee (0.015%)</td>
+                    <td class="px-5 py-2.5 text-right text-gray-400" x-text="fmt(costBreakdown.totalBuySebon)"></td>
+                    <td class="px-5 py-2.5 text-right text-gray-400" x-text="fmt(costBreakdown.totalSellSebon)"></td>
+                    <td class="px-5 py-2.5 text-right text-white font-medium" x-text="fmt(costBreakdown.totalSebon)"></td>
+                  </tr>
+                  <tr class="border-b border-border/40">
+                    <td class="px-5 py-2.5 text-gray-300">DP Charge (NPR 25/side)</td>
+                    <td class="px-5 py-2.5 text-right text-gray-400" x-text="fmt(costBreakdown.totalDPCharges / 2)"></td>
+                    <td class="px-5 py-2.5 text-right text-gray-400" x-text="fmt(costBreakdown.totalDPCharges / 2)"></td>
+                    <td class="px-5 py-2.5 text-right text-white font-medium" x-text="fmt(costBreakdown.totalDPCharges)"></td>
+                  </tr>
+                  <tr class="border-b border-border/40">
+                    <td class="px-5 py-2.5 text-gray-300">Capital Gains Tax</td>
+                    <td class="px-5 py-2.5 text-right text-gray-400">—</td>
+                    <td class="px-5 py-2.5 text-right text-gray-400" x-text="fmt(costBreakdown.totalCGT)"></td>
+                    <td class="px-5 py-2.5 text-right text-white font-medium" x-text="fmt(costBreakdown.totalCGT)"></td>
+                  </tr>
+                </tbody>
+                <tfoot>
+                  <tr class="border-t border-border bg-surface/50">
+                    <td class="px-5 py-2.5 font-semibold text-white" colspan="3">Grand Total</td>
+                    <td class="px-5 py-2.5 text-right font-semibold text-red-400" x-text="fmt(costBreakdown.grandTotal)"></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </section>
+
+          <!-- Per-Stock Breakdown -->
+          <section class="bg-card rounded-xl border border-border overflow-hidden">
+            <div class="px-5 py-3 border-b border-border">
+              <h3 class="text-sm font-semibold text-white">Per-Stock Costs</h3>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="border-b border-border/60 text-xs text-muted uppercase tracking-wider">
+                    <th class="px-5 py-2.5 text-left">Stock</th>
+                    <th class="px-5 py-2.5 text-right">Trades</th>
+                    <th class="px-5 py-2.5 text-right">Commission</th>
+                    <th class="px-5 py-2.5 text-right">SEBON</th>
+                    <th class="px-5 py-2.5 text-right">DP</th>
+                    <th class="px-5 py-2.5 text-right">CGT</th>
+                    <th class="px-5 py-2.5 text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="s in costBreakdown.perStock" :key="s.symbol">
+                    <tr class="border-b border-border/40 hover:bg-surface/50 transition">
+                      <td class="px-5 py-2.5 font-semibold text-white" x-text="s.symbol"></td>
+                      <td class="px-5 py-2.5 text-right text-gray-400" x-text="s.trades"></td>
+                      <td class="px-5 py-2.5 text-right text-gray-300" x-text="fmt(s.commission)"></td>
+                      <td class="px-5 py-2.5 text-right text-gray-300" x-text="fmt(s.sebon)"></td>
+                      <td class="px-5 py-2.5 text-right text-gray-300" x-text="fmt(s.dp)"></td>
+                      <td class="px-5 py-2.5 text-right text-gray-300" x-text="fmt(s.cgt)"></td>
+                      <td class="px-5 py-2.5 text-right text-white font-medium" x-text="fmt(s.commission + s.sebon + s.dp + s.cgt)"></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+        </div>
       </template>
     </div>
 

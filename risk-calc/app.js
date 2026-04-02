@@ -130,7 +130,7 @@ function saveIPOSold(sold) {
 document.addEventListener('alpine:init', () => {
   Alpine.data('riskCalc', () => ({
     // Tab state — restored from URL hash or localStorage
-    activeTab: (['quick', 'portfolio', 'ipo'].includes(location.hash.slice(1))
+    activeTab: (['quick', 'portfolio', 'ipo', 'costs'].includes(location.hash.slice(1))
       ? location.hash.slice(1)
       : localStorage.getItem('nepse_activeTab') || 'quick'),
 
@@ -144,6 +144,9 @@ document.addEventListener('alpine:init', () => {
     quickQty: 100,
     quickCustomProfit: '',
     quickCustomLoss: '',
+
+    // Costs tab state
+    includeIPOsInCosts: false,
 
     // Portfolio state
     holdings: [],
@@ -213,7 +216,7 @@ document.addEventListener('alpine:init', () => {
       // Handle browser back/forward
       window.addEventListener('hashchange', () => {
         const hash = location.hash.slice(1);
-        if (['quick', 'portfolio', 'ipo'].includes(hash)) this.activeTab = hash;
+        if (['quick', 'portfolio', 'ipo', 'costs'].includes(hash)) this.activeTab = hash;
       });
     },
 
@@ -786,6 +789,82 @@ document.addEventListener('alpine:init', () => {
       };
       saveIPOSold(this.ipoSoldTransactions);
       this.showIPOEditSoldModal = false;
+    },
+
+    // === Costs & Tax ===
+
+    get costBreakdown() {
+      let transactions = [...this.soldTransactions];
+      if (this.includeIPOsInCosts) {
+        transactions = transactions.concat(this.ipoSoldTransactions);
+      }
+
+      let totalBuyCommission = 0, totalSellCommission = 0;
+      let totalBuySebon = 0, totalSellSebon = 0;
+      let totalDPCharges = 0;
+      let totalCGTShort = 0, totalCGTLong = 0;
+      let perStock = {};
+
+      for (const t of transactions) {
+        const buyAmount = t.qty * t.buyPrice;
+        const sellAmount = t.qty * t.sellPrice;
+
+        const buyComm = calcCommission(buyAmount);
+        const sellComm = calcCommission(sellAmount);
+        const buySebon = buyAmount * SEBON_RATE;
+        const sellSebon = sellAmount * SEBON_RATE;
+        const dp = DP_CHARGE * 2; // buy + sell side
+
+        totalBuyCommission += buyComm;
+        totalSellCommission += sellComm;
+        totalBuySebon += buySebon;
+        totalSellSebon += sellSebon;
+        totalDPCharges += dp;
+
+        // CGT calculation
+        const buyCost = buyAmount + buyComm + buySebon + DP_CHARGE;
+        const sellCharges = sellComm + sellSebon + DP_CHARGE;
+        const grossProfit = sellAmount - buyCost - sellCharges;
+        if (grossProfit > 0) {
+          if (t.holdingDays > 365) {
+            totalCGTLong += grossProfit * CGT_LONG;
+          } else {
+            totalCGTShort += grossProfit * CGT_SHORT;
+          }
+        }
+
+        // Per-stock aggregation
+        const sym = t.name.toUpperCase();
+        if (!perStock[sym]) {
+          perStock[sym] = { symbol: sym, commission: 0, sebon: 0, dp: 0, cgt: 0, trades: 0 };
+        }
+        perStock[sym].commission += buyComm + sellComm;
+        perStock[sym].sebon += buySebon + sellSebon;
+        perStock[sym].dp += dp;
+        if (grossProfit > 0) {
+          perStock[sym].cgt += grossProfit * (t.holdingDays > 365 ? CGT_LONG : CGT_SHORT);
+        }
+        perStock[sym].trades++;
+      }
+
+      const totalCommission = totalBuyCommission + totalSellCommission;
+      const totalSebon = totalBuySebon + totalSellSebon;
+      const totalCGT = totalCGTShort + totalCGTLong;
+      const grandTotal = totalCommission + totalSebon + totalDPCharges + totalCGT;
+
+      return {
+        totalCommission, totalBuyCommission, totalSellCommission,
+        totalSebon, totalBuySebon, totalSellSebon,
+        totalDPCharges,
+        totalCGT, totalCGTShort, totalCGTLong,
+        grandTotal,
+        transactionCount: transactions.length,
+        perStock: Object.values(perStock).sort((a, b) => {
+          const totalA = a.commission + a.sebon + a.dp + a.cgt;
+          const totalB = b.commission + b.sebon + b.dp + b.cgt;
+          return totalB - totalA;
+        }),
+      };
     },
 
     exportPortfolio() {
