@@ -50,7 +50,7 @@
           </div>
           <span class="text-sm text-gray-300">Include Tax</span>
         </div>
-        <div x-show="includeTax" x-transition class="flex items-center gap-2">
+        <div x-show="includeTax && activeTab === 'quick'" x-transition class="flex items-center gap-2">
           <label class="text-sm text-gray-400">Holding Days:</label>
           <input type="number" x-model.number="holdingDays" min="1"
             class="w-20 bg-surface border border-border rounded-lg px-3 py-1.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent/60" />
@@ -367,6 +367,9 @@
                 </template>
                 <span class="text-muted" x-text="holding.buyDate"></span>
                 <span class="bg-surface px-2 py-0.5 rounded text-gray-400" x-text="holdingDaysHeld(holding) + 'd'"></span>
+                <template x-if="includeTax">
+                  <span class="text-xs" :class="holdingDaysHeld(holding) > 365 ? 'text-green-400' : 'text-yellow-400'" x-text="holdingDaysHeld(holding) > 365 ? '5%' : '7.5%'"></span>
+                </template>
               </div>
             </div>
 

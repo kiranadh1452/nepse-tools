@@ -231,9 +231,10 @@ document.addEventListener('alpine:init', () => {
       return rows;
     },
 
-    calcTargetRow(qty, buyPrice, margin, type, isPortfolio) {
+    calcTargetRow(qty, buyPrice, margin, type, isPortfolio, days) {
       const totalBuyCost = calcTotalBuyCost(qty, buyPrice, this.includeCharges);
       const perShareCost = totalBuyCost / qty;
+      const effectiveDays = days != null ? days : this.holdingDays;
 
       let targetPrice, netAmount, plAmount;
 
@@ -244,11 +245,11 @@ document.addEventListener('alpine:init', () => {
           let lo = buyPrice, hi = buyPrice * (1 + margin * 3 / 100);
           for (let i = 0; i < 100; i++) {
             const mid = (lo + hi) / 2;
-            const net = calcNetFromSell(qty, mid, totalBuyCost, this.includeCharges, this.includeTax, this.holdingDays);
+            const net = calcNetFromSell(qty, mid, totalBuyCost, this.includeCharges, this.includeTax, effectiveDays);
             if (net < targetNet) lo = mid; else hi = mid;
           }
           targetPrice = (lo + hi) / 2;
-          netAmount = calcNetFromSell(qty, targetPrice, totalBuyCost, this.includeCharges, this.includeTax, this.holdingDays);
+          netAmount = calcNetFromSell(qty, targetPrice, totalBuyCost, this.includeCharges, this.includeTax, effectiveDays);
         } else {
           targetPrice = buyPrice * (1 + margin / 100);
           netAmount = qty * targetPrice;
@@ -415,7 +416,8 @@ document.addEventListener('alpine:init', () => {
         margins.push(Number(this.portfolioCustomProfit));
         margins.sort((a, b) => a - b);
       }
-      return margins.map(m => this.calcTargetRow(holding.qty, holding.buyPrice, m, 'profit', true));
+      const days = this.holdingDaysHeld(holding);
+      return margins.map(m => this.calcTargetRow(holding.qty, holding.buyPrice, m, 'profit', true, days));
     },
 
     holdingLossRows(holding) {
@@ -424,7 +426,8 @@ document.addEventListener('alpine:init', () => {
         margins.push(Number(this.portfolioCustomLoss));
         margins.sort((a, b) => a - b);
       }
-      return margins.map(m => this.calcTargetRow(holding.qty, holding.buyPrice, m, 'loss', true));
+      const days = this.holdingDaysHeld(holding);
+      return margins.map(m => this.calcTargetRow(holding.qty, holding.buyPrice, m, 'loss', true, days));
     },
 
     holdingDaysHeld(holding) {
