@@ -197,6 +197,13 @@
 
         async refresh(force = false) {
           this.loading = true;
+          // During market hours, force re-fetch if last fetch was over 1 minute ago
+          if (!force && NepseAPI.isMarketOpen()) {
+            const cached = NepseAPI.readCache();
+            if (!cached || Date.now() - cached.timestamp > 60 * 1000) {
+              force = true;
+            }
+          }
           const result = await NepseAPI.getMarketData(force);
           this.marketOpen = result.marketOpen;
           this.lastUpdated = result.lastUpdated;
