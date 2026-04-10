@@ -95,7 +95,7 @@
 
     <template x-if="!hasData && !loading">
       <div class="bg-card rounded-xl border border-border p-10 text-center">
-        <p class="text-muted">No market data available. Data is fetched during market hours (Sun–Thu, 11 AM – 3 PM NPT).</p>
+        <p class="text-muted">No market data available. Data is fetched during market hours (Mon–Fri, 11 AM – 3 PM NPT).</p>
         <button @click="refresh(true)" class="mt-3 text-sm text-accent hover:underline">Force refresh anyway</button>
       </div>
     </template>

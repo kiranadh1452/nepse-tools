@@ -4,7 +4,7 @@
  * Fetches live stock prices from Merolagani's public API.
  * Caches in localStorage so all tools share the same data.
  *
- * Market hours: Sun–Thu, 11:00 AM – 3:00 PM NPT (UTC+5:45)
+ * Market hours: Mon–Fri, 11:00 AM – 3:00 PM NPT (UTC+5:45)
  * Outside market hours, cached data is served without fetching.
  */
 
@@ -26,7 +26,7 @@ function getNPT() {
 
 /**
  * Check if NEPSE market is currently open.
- * Sun(0)–Thu(4), 11:00–15:00 NPT.
+ * Mon(1)–Fri(5), 11:00–15:00 NPT.
  */
 function isMarketOpen() {
   const npt = getNPT();
@@ -35,8 +35,8 @@ function isMarketOpen() {
   const minutes = npt.getMinutes();
   const timeInMinutes = hour * 60 + minutes;
 
-  // Market days: Sun(0) to Thu(4)
-  if (day > 4) return false; // Fri(5), Sat(6)
+  // Market days: Mon(1) to Fri(5)
+  if (day === 0 || day === 6) return false; // Sat(6), Sun(0)
 
   // Market hours: 11:00 to 15:00 NPT
   return timeInMinutes >= 660 && timeInMinutes < 900;
